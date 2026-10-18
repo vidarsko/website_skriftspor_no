@@ -1,0 +1,614 @@
+/* ==========================================================================
+   app.css — the writing surface (/skriv/), the front page's drop zone,
+   overview and detail view, and the replay player. Tokens only.
+
+   Squares everywhere, like the rest of the system. The only shadow is the
+   toast, which floats over the page (see --shadow-float in tokens.css).
+   ========================================================================== */
+
+/* `hidden` must win over component display rules (.btn is inline-flex). */
+[hidden] { display: none !important; }
+
+/* --------------------------------------------------------------------------
+   Origin marks — shared by the sheet, the player and the comparison.
+   Pasted text is ALWAYS tint + dotted underline + a legend in words.
+   -------------------------------------------------------------------------- */
+
+.mark-pasted {
+  background: var(--pasted-tint);
+  color: inherit;
+  text-decoration: underline dotted var(--pasted);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.22em;
+}
+.mark-unknown {
+  background: var(--paper-2);
+  color: inherit;
+}
+.mark-missing {
+  background: var(--warn-tint);
+  color: inherit;
+  text-decoration: underline wavy var(--warn-text);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
+}
+.mark-typed { color: inherit; }
+
+.legend-pasted,
+.legend-missing,
+.legend-typed,
+.legend-fresh {
+  padding: 0 0.25em;
+}
+.legend-pasted  { background: var(--pasted-tint); text-decoration: underline dotted var(--pasted); text-decoration-thickness: 2px; text-underline-offset: 0.22em; }
+.legend-missing { background: var(--warn-tint); text-decoration: underline wavy var(--warn-text); text-underline-offset: 0.22em; }
+.legend-typed   { border-bottom: 2px solid var(--primary); }
+.legend-fresh   { background: var(--primary-tint); }
+
+.note-small {
+  font-size: var(--step-xs);
+  color: var(--ink-3);
+  max-width: var(--measure-prose);
+  margin-top: var(--space-2);
+}
+
+/* A quiet text button — for "Ny tekst" and "Skjul", the actions that must
+   not compete with the primary one. Still 44px tall. */
+.btn--quiet {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.btn--quiet:hover { color: var(--ink); background: var(--paper); }
+
+/* --------------------------------------------------------------------------
+   /skriv/ — the bar
+   -------------------------------------------------------------------------- */
+
+.writebar { padding-block: var(--space-3); }
+
+.writebar__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.writebar__title { flex: 1 1 18rem; min-width: 0; }
+
+.writebar__titleinput {
+  width: 100%;
+  padding: var(--space-1) 0;
+  border: 0;
+  border-bottom: 1px solid var(--rule-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--step-l);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.writebar__titleinput::placeholder { color: var(--ink-3); font-weight: 500; }
+.writebar__titleinput:focus { outline: none; border-bottom-color: var(--primary); }
+
+.writebar__status {
+  margin: var(--space-1) 0 0;
+  font-size: var(--step-xs);
+  color: var(--ink-3);
+}
+.writebar__status.is-warn { color: var(--warn-text); font-weight: 500; }
+
+.writebar__actions { flex: 0 1 auto; }
+
+/* --------------------------------------------------------------------------
+   /skriv/ — the intro
+   -------------------------------------------------------------------------- */
+
+.writeintro { padding-block: var(--space-4); }
+.writeintro[hidden] { display: none; }
+
+.writeintro__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+.writeintro__title { font-size: var(--step-l); margin-bottom: var(--space-2); }
+
+.writeintro__steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: 0 0 var(--space-2);
+  padding-left: 1.25em;
+  font-family: var(--font-serif);
+  font-size: var(--step-s);
+  line-height: 1.55;
+}
+.writeintro__steps strong { font-family: var(--font-sans); font-weight: 600; }
+
+.writeintro__note {
+  font-size: var(--step-xs);
+  color: var(--ink-2);
+  margin: 0;
+}
+
+/* --------------------------------------------------------------------------
+   /skriv/ — the sheet: a textarea over a highlight mirror.
+
+   The two MUST have identical box metrics and text settings, or the marks
+   drift off the words. Everything that affects line breaking is set on
+   both together, below, and nowhere else. The textarea grows with its
+   content (js/write.js), so neither ever scrolls on its own.
+   -------------------------------------------------------------------------- */
+
+.writearea { padding-block: var(--space-4) var(--space-band); }
+
+.sheet {
+  position: relative;
+  max-width: 46rem;
+  margin-inline: auto;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+}
+.sheet:focus-within { border-color: var(--rule-strong); outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.sheet__mirror,
+.sheet__input {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  border: 0;
+  padding: clamp(1.25rem, 4vw, 3rem);
+  font-family: var(--font-write);
+  font-size: var(--step-m);
+  font-weight: 400;
+  line-height: 1.65;
+  letter-spacing: normal;
+  word-spacing: normal;
+  tab-size: 4;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  text-align: left;
+}
+
+.sheet__mirror {
+  position: absolute;
+  inset: 0;
+  color: transparent;
+  overflow: hidden;
+  pointer-events: none;
+}
+.sheet__mirror mark { color: transparent; }
+
+.sheet__input {
+  position: relative;
+  min-height: 60vh;
+  resize: none;
+  overflow: hidden;
+  background: transparent;
+  color: var(--ink);
+  caret-color: var(--primary);
+}
+.sheet__input:focus { outline: none; }
+.sheet__input::placeholder { color: var(--ink-3); }
+
+.sheet__foot {
+  max-width: 46rem;
+  margin: var(--space-2) auto 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+.sheet__stats,
+.sheet__legend {
+  margin: 0;
+  font-size: var(--step-xs);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.sheet__legend span { color: var(--ink-2); }
+
+/* --------------------------------------------------------------------------
+   Toast — the one floating element.
+   -------------------------------------------------------------------------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-3);
+  transform: translateX(-50%);
+  z-index: 50;
+  width: min(36rem, calc(100% - 2 * var(--space-2)));
+  padding: var(--space-2) var(--space-3);
+  background: var(--ink);
+  color: var(--ink-inverse);
+  box-shadow: var(--shadow-float);
+  font-size: var(--step-s);
+  line-height: 1.45;
+}
+.toast[hidden] { display: none; }
+
+/* --------------------------------------------------------------------------
+   Drop panels and paste box (the comparison on the front page)
+   -------------------------------------------------------------------------- */
+
+.check__privacy { font-size: var(--step-xs); color: var(--ink-3); margin: var(--space-2) 0 var(--space-4); }
+
+.inputs { grid-template-columns: 1fr; }
+@media (min-width: 768px) { .inputs { grid-template-columns: 1fr 1fr; } }
+
+.drop {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--surface);
+  min-width: 0;
+  transition: background-color 150ms ease;
+}
+.drop.is-over { background: var(--primary-tint); outline: 2px dashed var(--primary); outline-offset: -6px; }
+.drop__title { font-size: var(--step-l); margin: 0; }
+.drop__optional { font-weight: 400; color: var(--ink-3); font-size: var(--step-s); }
+.drop__body, .drop__hint { margin: 0; font-family: var(--font-serif); color: var(--ink-2); }
+.drop__hint { font-size: var(--step-xs); }
+.drop__file { margin: 0; font-size: var(--step-xs); font-weight: 500; color: var(--ok); }
+.drop__file::before { content: '\2713\00a0'; }
+
+.drop__paste summary { cursor: pointer; font-size: var(--step-xs); color: var(--ink-2); min-height: 44px; display: flex; align-items: center; }
+.drop__paste textarea {
+  display: block;
+  width: 100%;
+  margin: var(--space-1) 0;
+  padding: var(--space-1);
+  border: 1px solid var(--rule-strong);
+  border-radius: 0;
+  font-family: var(--font-serif);
+  font-size: var(--step-s);
+  resize: vertical;
+}
+
+.check__error {
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--danger-tint);
+  color: var(--danger-text);
+  font-weight: 500;
+}
+.check__error[hidden] { display: none; }
+
+/* --------------------------------------------------------------------------
+   Detail view — facts, share bars, checks, comparison
+   -------------------------------------------------------------------------- */
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: 0;
+  border-top: 1px solid var(--rule);
+  border-left: 1px solid var(--rule);
+  margin: var(--space-4) 0;
+}
+.facts__item {
+  background: var(--surface);
+  padding: var(--space-2) var(--space-3);
+  border-right: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.facts dt {
+  font-size: var(--step-xs);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.facts dd { margin: 0.25rem 0 0; font-size: var(--step-m); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.share { margin: var(--space-3) 0; max-width: 46rem; }
+.share__caption { font-size: var(--step-xs); color: var(--ink-3); margin-bottom: var(--space-1); }
+.share__bar { display: flex; height: 14px; background: var(--paper-2); border: 1px solid var(--rule); }
+.share__part { display: block; height: 100%; }
+.share__part--typed   { background: var(--primary); }
+.share__part--pasted  { background: var(--pasted); }
+.share__part--unknown { background: var(--ink-3); }
+.share__part--missing { background: var(--rule-strong); }
+.share__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  list-style: none;
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  font-size: var(--step-s);
+  font-variant-numeric: tabular-nums;
+}
+.share__swatch { display: inline-block; width: 0.8em; height: 0.8em; margin-right: 0.4em; vertical-align: -0.05em; }
+
+.checks { list-style: none; margin: 0 0 var(--space-3); padding: 0; border-top: 1px solid var(--rule); max-width: 52rem; }
+.checks__item {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--rule);
+}
+.checks__badge {
+  flex: 0 0 5.5rem;
+  padding: 0.15rem 0.5rem;
+  font-size: var(--step-xs);
+  font-weight: 600;
+  text-align: center;
+}
+.checks__item--ok   .checks__badge { background: var(--ok-tint); color: var(--ok); }
+.checks__item--bad  .checks__badge { background: var(--danger-tint); color: var(--danger-text); }
+.checks__item--none .checks__badge { background: var(--paper-2); color: var(--ink-2); }
+.checks__text strong { font-weight: 600; }
+.checks__detail { display: block; font-family: var(--font-serif); color: var(--ink-2); margin-top: 0.2rem; }
+
+.cmp__legend { display: flex; flex-wrap: wrap; gap: var(--space-2); font-size: var(--step-xs); margin: var(--space-3) 0 var(--space-1); }
+
+.cmp__text {
+  max-height: 34rem;
+  overflow: auto;
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  font-family: var(--font-serif);
+  font-size: var(--step-m);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+/* --------------------------------------------------------------------------
+   The replay player
+   -------------------------------------------------------------------------- */
+
+.player { min-width: 0; margin-top: var(--space-3); }
+
+.player__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.player__play { min-width: 9rem; }
+.player__range { flex: 1 1 14rem; min-width: 0; height: 44px; accent-color: var(--primary); }
+.player__opt { display: inline-flex; align-items: center; gap: 0.4em; font-size: var(--step-xs); color: var(--ink-2); min-height: 44px; }
+.player__opt input { accent-color: var(--primary); width: 1.1rem; height: 1.1rem; }
+.player__select {
+  min-height: 36px;
+  padding: 0 var(--space-1);
+  border: 1px solid var(--rule-strong);
+  border-radius: 0;
+  background: var(--surface);
+  font: inherit;
+  color: var(--ink);
+}
+
+.player__timeline {
+  position: relative;
+  height: 2.25rem;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+}
+.player__seg {
+  position: absolute;
+  top: 0;
+  bottom: 10px;
+  padding: 0 0 0 0.35rem;
+  border: 0;
+  border-right: 1px solid var(--rule-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-3);
+  font-family: var(--font-sans);
+  font-size: var(--step-xs);
+  text-align: left;
+  overflow: hidden;
+  cursor: pointer;
+}
+.player__seg:hover { background: var(--primary-tint); color: var(--ink); }
+.player__tick { position: absolute; bottom: 0; width: 2px; height: 9px; margin-left: -1px; background: var(--pasted); }
+.player__head { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--primary); pointer-events: none; }
+
+.player__meta {
+  margin: var(--space-2) 0;
+  font-size: var(--step-xs);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  min-height: 1.4em;
+}
+
+.player__text {
+  position: relative;
+  height: min(60vh, 34rem);
+  overflow: auto;
+  padding: clamp(1.25rem, 4vw, 3rem);
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  font-family: var(--font-write);
+  font-size: var(--step-m);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.player__caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.15em;
+  margin-right: -2px;
+  vertical-align: text-bottom;
+  background: var(--primary-mark);
+}
+.player__fresh { background: var(--primary-tint); }
+.player__del { color: var(--danger-text); background: var(--danger-tint); text-decoration: line-through; }
+.player__legend { margin-top: var(--space-2); }
+
+/* --------------------------------------------------------------------------
+   Front page — the drop band. The FIRST thing on the site, edge to edge,
+   on --primary (the page's one loud band). The dashed frame inside it is
+   the target the page points at; the whole window accepts the drop.
+   -------------------------------------------------------------------------- */
+
+.dropband {
+  width: 100%;
+  background: var(--primary);
+  color: var(--ink-inverse);
+}
+.dropband__inner {
+  max-width: var(--measure-wide);
+  margin-inline: auto;
+  padding: var(--space-5) var(--gutter);
+}
+.dropband__zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-2);
+  min-height: clamp(18rem, 45vh, 28rem);
+  justify-content: center;
+  padding: var(--space-5) var(--space-3);
+  border: 2px dashed var(--rule-inverse);
+}
+.dropband__title {
+  font-size: var(--step-2xl);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.dropband__sub {
+  font-family: var(--font-serif);
+  font-size: var(--step-m);
+  max-width: 40ch;
+  margin: 0;
+}
+.dropband__actions { justify-content: center; margin-top: var(--space-2); }
+.dropband__note { font-size: var(--step-xs); margin: var(--space-1) 0 0; }
+.dropband .btn--primary { background: var(--ink-inverse); color: var(--ink); }
+.dropband .btn--primary:hover { background: var(--surface); color: var(--primary-strong); }
+.dropband .btn--ghost { color: var(--ink-inverse); }
+.dropband .btn--ghost:hover { background: var(--ink-inverse); color: var(--ink); }
+.dropband :focus-visible { outline-color: var(--ink-inverse); }
+
+/* Once files are open, the band shrinks to a strip: still there to drop
+   more on, no longer the whole first screen. */
+.has-files .dropband__inner { padding-block: var(--space-2); }
+.has-files .dropband__zone {
+  min-height: 0;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+}
+.has-files .dropband__title { font-size: var(--step-l); }
+.has-files .dropband__sub,
+.has-files .dropband__note { display: none; }
+.has-files .dropband__actions { margin: 0; }
+
+/* While dragging files over the window. */
+.dragcover {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim);
+  color: var(--ink-inverse);
+  font-size: var(--step-xl);
+  font-weight: 600;
+  pointer-events: none;
+}
+.dragcover[hidden] { display: none; }
+.dragcover p { margin: 0; padding: var(--space-4); border: 2px dashed var(--ink-inverse); }
+
+.inbox__error {
+  max-width: var(--measure-wide);
+  margin: var(--space-3) auto 0;
+  padding: var(--space-2) var(--gutter);
+  background: var(--danger-tint);
+  color: var(--danger-text);
+  font-weight: 500;
+}
+.inbox__error[hidden] { display: none; }
+
+/* --------------------------------------------------------------------------
+   Overview table
+   -------------------------------------------------------------------------- */
+
+.overview__head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+.overview__title { font-size: var(--step-xl); margin-bottom: 0; }
+.overview__hint { font-size: var(--step-xs); color: var(--ink-3); margin: var(--space-2) 0; }
+
+.tablewrap { overflow-x: auto; border: 1px solid var(--rule); background: var(--surface); }
+
+.overview {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--step-s);
+  font-variant-numeric: tabular-nums;
+}
+.overview th, .overview td {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--rule);
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+.overview .num { text-align: right; }
+.overview th { background: var(--paper-2); padding: 0; }
+.overview th button {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--step-xs);
+  font-weight: 600;
+  color: var(--ink-2);
+  text-align: inherit;
+  cursor: pointer;
+}
+.overview th button:hover { color: var(--ink); background: var(--paper); }
+.overview th[aria-sort="ascending"] button,
+.overview th[aria-sort="descending"] button { color: var(--ink); }
+.overview tbody tr { cursor: pointer; }
+.overview tbody tr:hover,
+.overview tbody tr:focus-visible { background: var(--primary-tint); outline: none; }
+.ov__title { display: block; font-weight: 600; white-space: normal; min-width: 12rem; }
+.ov__file { display: block; font-size: var(--step-xs); color: var(--ink-3); white-space: normal; }
+
+.badge { display: inline-block; padding: 0.1rem 0.5rem; font-size: var(--step-xs); font-weight: 600; }
+.badge--ok  { background: var(--ok-tint); color: var(--ok); }
+.badge--bad { background: var(--danger-tint); color: var(--danger-text); }
+
+/* --------------------------------------------------------------------------
+   Detail view — the replay comes first and gets the room.
+   -------------------------------------------------------------------------- */
+
+.detail__top { padding-top: var(--space-4); }
+.detail__back { margin: 0 0 var(--space-2) calc(-1 * var(--space-2)); }
+.detail__title { font-size: var(--step-xl); margin-bottom: var(--space-2); }
+.detail__top .player__text { height: min(65vh, 40rem); }
+.detail__top .player__timeline { height: 2.75rem; cursor: ew-resize; }

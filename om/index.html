@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Slik virker det — Skriftspor</title>
+  <meta name="description" content="Hva Skriftspor tar vare på, hva en spor-fil kan vise, og hva den ikke kan vise.">
+
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+
+  <script src="/js/header.js" defer></script>
+</head>
+<body>
+
+  <header class="siteheader" data-site-header></header>
+
+  <main>
+    <section class="band">
+      <div class="band__inner band__inner--prose">
+        <p class="eyebrow">Slik virker det</p>
+        <h1>Et verktøy for å vise prosessen, ikke for å overvåke</h1>
+        <div class="prose">
+          <p class="lede-p">Skriftspor er laget for elever som har skrevet teksten sin selv og vil kunne vise det. Det er ikke en KI-detektor, og det gjetter ikke på noe.</p>
+
+          <h2>Hva som blir tatt vare på</h2>
+          <p>Mens du skriver i skriveblokka, blir disse endringene lagret med tidspunkt:</p>
+          <ul>
+            <li>tekst du skriver inn, tegn for tegn</li>
+            <li>tekst du sletter, og hva den var</li>
+            <li>tekst du limer inn eller drar inn, merket som <em>innlimt</em></li>
+            <li>når du flytter markøren eller merker tekst</li>
+          </ul>
+          <p>Ingenting annet blir registrert: ikke hva du gjør i andre vinduer eller faner, ikke musebevegelser, ikke hvor lenge du ser på skjermen. Verktøyet viser hvordan teksten ble bygget, ikke hva du gjorde ellers.</p>
+
+          <h2>Innliming er lov</h2>
+          <p>Det er helt greit å lime inn sitater, referanser og dine egne notater. Innlimt tekst blir bare merket som innlimt, så den som leser spor-fila ser forskjell på det du skrev og det du hentet. Hvis læreren har egne regler for hva som kan limes inn, er det de som gjelder.</p>
+
+          <h2>Hvorfor en så enkel skriveblokk?</h2>
+          <p>Skriftspor er ikke en tekstbehandler, og skal ikke bli det. Det er ren tekst, uten fet skrift, overskrifter, sideoppsett eller kildeliste. Det gjør du etterpå i Word eller Docs, som du pleier. Det er en del av poenget: spor-fila handler om <em>teksten</em>, og sammenligningen tåler at formateringen endres etterpå.</p>
+
+          <h2>Økter</h2>
+          <p>Skrivingen deles i økter. En ny økt begynner når du har hatt en pause på mer enn 30 minutter, eller når du laster opp spor-fila igjen for å skrive videre. Avspillingen viser øktene i en tidslinje.</p>
+
+          <h2>Hva en spor-fil viser</h2>
+          <ul>
+            <li>Hvordan teksten vokste fram: utkast, omskrivinger, flytting og sletting.</li>
+            <li>Når den ble skrevet, og hvor lang tid det tok.</li>
+            <li>Hvor mye som ble skrevet og hvor mye som ble limt inn.</li>
+            <li>Om fila er hel og uendret. Hver økt har sjekksummer, og øktene er lenket sammen i en hash-kjede, så en endring i loggen etterpå blir synlig.</li>
+            <li>At skrivingen ikke kan ha skjedd før et bestemt tidspunkt. Mens du skriver, henter siden av og til et offentlig tilfeldig tall fra <a href="https://drand.love">drand</a>. Tallet kan ikke kjennes på forhånd, så en logg som inneholder det, kan ikke ha blitt laget før.</li>
+          </ul>
+
+          <h2>Hva en spor-fil ikke viser</h2>
+          <p>Den viser <strong>ikke</strong> at ingen KI ble brukt. Noen kan skrive av en tekst fra en annen skjerm, eller bruke et program som taster for dem. En teknisk flink person kan også lage en falsk spor-fil fra bunnen av, siden alt skjer i nettleseren og ingen server holder kontroll.</p>
+          <p>Målet er ikke å være vanntett. Det er å gjøre det litt enklere å være ærlig og litt mer krevende å jukse. Avspillingen er derfor best brukt som utgangspunkt for en samtale: Hvorfor strøk du dette avsnittet? Hva tenkte du da du flyttet konklusjonen fram?</p>
+
+          <h2>For lærere</h2>
+          <p>Slipp spor-filene på <a href="/">forsiden</a>. Slipper du flere, får du en oversikt over alle innleveringene med tid brukt, aktiv tid, antall økter og andel innlimt, og kan trykke deg inn på hver av dem for å spille den av. Der kan du også slippe den innleverte teksten (Word, PDF, OpenDocument eller ren tekst). Siden viser hvor stor del av den innleverte teksten som finnes i spor-fila. Sammenligningen ser bare på ordene, så formatering, tegnsetting og avsnitt som er flyttet, teller ikke. Overskrifter, kildeliste og små rettelser gjort i Word etterpå vil vanligvis vises som udokumentert, og det er forventet.</p>
+          <p>Ingen av filene lastes opp noe sted. Alt skjer i nettleseren din.</p>
+
+          <h2>Ta vare på fila</h2>
+          <p>Teksten lagres i nettleseren mens du skriver, men bare der. Tømmes nettleseren, eller bruker du en skole-PC som slettes, er den borte. Last ned spor-fila hver gang du er ferdig for dagen. Med fila kan du fortsette å skrive på en hvilken som helst maskin.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="band band--dark sitefooter">
+    <div class="band__inner sitefooter__inner">
+      <p>Skriftspor — vis skriveprosessen din. Laget av Vidar Skogvoll.</p>
+      <p><a href="/personvern/">Personvern</a> · <a href="/format/">Filformatet</a></p>
+    </div>
+  </footer>
+
+</body>
+</html>

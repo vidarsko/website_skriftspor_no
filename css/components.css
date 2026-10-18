@@ -1,0 +1,510 @@
+/* ==========================================================================
+   components.css — nav, hero, buttons, tiles, footer.
+   Taken from aiskilltrees.com (ui-style-banded-fullbleed v1.3) with only the
+   hero changed: there is no video here; the hero carries a live replay of a
+   short demo log instead (js/hero-demo.js). Tokens only.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Site header — full-bleed bar, gutter on the contents only.
+   -------------------------------------------------------------------------- */
+
+.siteheader {
+  width: 100%;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+}
+
+.siteheader__inner {
+  max-width: var(--measure-wide);
+  margin-inline: auto;
+  padding: var(--space-2) var(--gutter);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.wordmark {
+  font-family: var(--font-sans);
+  font-size: var(--step-s);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-decoration: none;
+}
+.wordmark:hover { color: var(--primary); }
+
+.wordmark__mark {
+  color: var(--primary);
+  margin-right: 0.35em;
+}
+
+.sitenav {
+  display: flex;
+  gap: var(--space-3);
+  font-size: var(--step-s);
+  font-weight: 500;
+}
+.sitenav a {
+  color: var(--ink-2);
+  text-decoration: none;
+  padding: var(--space-1) 0;
+}
+.sitenav a:hover {
+  color: var(--primary);
+  text-decoration: underline;
+  text-underline-offset: 0.3em;
+}
+
+/* --------------------------------------------------------------------------
+   Nav, language dropdown and drawer.
+
+   All rendered by js/header.js — one file for every page. Square like the
+   rest of the system: no radius anywhere, hairline rules, flat fills.
+
+   Breakpoint is 768px, the system's phone → tablet step. Above it the nav
+   and the language control sit inline in the bar; below, the burger appears
+   and the same elements become a full-width drawer under the bar. It is one
+   markup tree switched by CSS, not two variants to keep in sync.
+
+   Not present on a tree page: a skill tree is single-language and has its
+   own floating menu. See js/engine.js.
+   -------------------------------------------------------------------------- */
+
+.siteheader__inner {
+  gap: var(--space-2);
+  position: relative;
+  flex-wrap: wrap;
+}
+
+.sitenav-panel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-left: auto;
+}
+
+.sitenav {
+  display: flex;
+  gap: var(--space-3);
+  font-size: var(--step-s);
+  font-weight: 500;
+}
+.sitenav a {
+  color: var(--ink-2);
+  text-decoration: none;
+  padding: var(--space-1) 0;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+}
+.sitenav a:hover {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+/* The current page is marked by weight AND a rule AND aria-current — the
+   colour is the least of the three signals. */
+.sitenav a.is-current {
+  color: var(--ink);
+  font-weight: 600;
+  border-bottom-color: var(--ink);
+}
+
+/* ---- Language dropdown --------------------------------------------------- */
+
+.lang-select { position: relative; flex: 0 0 auto; }
+
+.lang-select__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: var(--step-xs);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+.lang-select__button:hover { background: var(--surface); color: var(--ink); border-color: var(--rule-strong); }
+/* Ikonslissa foran navnet. `__globe` er toppbarens klode; `__icon` er det
+   generelle navnet, som /prompts/ bruker for begge velgerne sine — der er
+   den andre en bokstabel, ikke en klode. */
+.lang-select__globe,
+.lang-select__icon { font-size: 1em; line-height: 1; }
+.lang-select__caret { font-size: 0.8em; color: var(--ink-3); }
+.lang-select__button[aria-expanded="true"] { background: var(--surface); color: var(--ink); border-color: var(--rule-strong); }
+
+.lang-select__menu {
+  position: absolute;
+  top: calc(100% + 1px);
+  right: 0;
+  z-index: 40;
+  display: none;
+  min-width: 11rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--rule-strong);
+}
+.lang-select__menu.is-open { display: block; }
+
+.lang-select__option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: var(--step-s);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.lang-select__option:hover { background: var(--paper-2); color: var(--ink); }
+.lang-select__option[aria-selected="true"] { color: var(--ink); background: var(--primary-tint); }
+.lang-select__tick { width: 1em; color: var(--primary); }
+
+/* ---- Burger + drawer ------------------------------------------------------ */
+
+.navtoggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-left: auto;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  background: var(--paper);
+  cursor: pointer;
+}
+.navtoggle:hover { background: var(--surface); border-color: var(--rule-strong); }
+
+/* Three bars drawn from one element: the middle is the box, the outer two
+   are its pseudo-elements. */
+.navtoggle__bars,
+.navtoggle__bars::before,
+.navtoggle__bars::after {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: var(--ink);
+}
+.navtoggle__bars { position: relative; }
+.navtoggle__bars::before,
+.navtoggle__bars::after { content: ''; position: absolute; left: 0; }
+.navtoggle__bars::before { top: -6px; }
+.navtoggle__bars::after  { top: 6px; }
+
+@media (max-width: 767px) {
+  .navtoggle { display: inline-flex; }
+
+  .sitenav-panel {
+    display: none;
+    order: 3;
+    width: 100%;
+    margin-left: 0;
+    padding-top: var(--space-2);
+    border-top: 1px solid var(--rule);
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+  }
+  .siteheader[data-open="true"] .sitenav-panel { display: flex; }
+
+  .sitenav { flex-direction: column; gap: 0; }
+  .sitenav a {
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--rule);
+    border-left: 2px solid transparent;
+    font-size: var(--step-m);
+  }
+  .sitenav a.is-current { border-left-color: var(--ink); padding-left: var(--space-2); }
+  .sitenav a:hover { border-left-color: var(--primary); padding-left: var(--space-2); }
+
+  /* Skuffen, ikke komponenten: velgeren på /prompts/ står i en vanlig
+     tekstlinje og skal ikke arve skuffens marg. */
+  .sitenav-panel .lang-select { margin-top: var(--space-2); align-self: flex-start; }
+  .sitenav-panel .lang-select__menu { right: auto; left: 0; }
+}
+
+/* --------------------------------------------------------------------------
+   Hero — a loud band with display type. Not used on the front page since
+   2026-10-18 (the drop band in app.css took its place); kept for pages
+   that want one.
+   -------------------------------------------------------------------------- */
+
+.hero {
+  width: 100%;
+  background: var(--primary);
+  color: var(--ink-inverse);
+}
+/* Full opacity: the system's 0.75 eyebrow on a coloured band drops below
+   AA at this size on orange (4.97:1 at full strength). */
+.hero .eyebrow { color: var(--ink-inverse); opacity: 1; }
+.hero :focus-visible { outline-color: var(--ink-inverse); }
+
+.hero__inner {
+  max-width: var(--measure-wide);
+  margin-inline: auto;
+  padding: var(--space-band-lg) var(--gutter) var(--space-band);
+  display: grid;
+  gap: var(--space-5);
+  align-items: center;
+}
+@media (min-width: 1024px) {
+  .hero__inner { grid-template-columns: 1.1fr 1fr; }
+}
+
+.hero__title {
+  font-size: var(--step-3xl);
+  font-weight: 700;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  max-width: 14ch;
+  margin-bottom: var(--space-3);
+}
+
+.hero__lede {
+  font-family: var(--font-serif);
+  font-size: var(--step-l);
+  line-height: 1.45;
+  max-width: 44ch;
+  margin-bottom: var(--space-4);
+}
+
+/* --------------------------------------------------------------------------
+   Buttons — square, sans, 500. No radius anywhere in this system.
+   -------------------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0.75rem 1.5rem;
+  border: 1px solid transparent;
+  border-radius: 0;
+  font-family: var(--font-sans);
+  font-size: var(--step-s);
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+
+.btn--primary {
+  background: var(--primary);
+  color: var(--ink-inverse);
+}
+.btn--primary:hover { background: var(--primary-strong); color: var(--ink-inverse); }
+
+.btn--ghost {
+  background: transparent;
+  border-color: currentColor;
+  color: var(--ink);
+}
+.btn--ghost:hover { background: var(--ink); color: var(--ink-inverse); }
+
+/* On a dark or primary band the pair inverts. */
+.hero .btn--primary,
+.band--dark .btn--primary,
+.band--primary .btn--primary {
+  background: var(--ink-inverse);
+  color: var(--ink);
+}
+.hero .btn--primary:hover,
+.band--dark .btn--primary:hover,
+.band--primary .btn--primary:hover {
+  background: var(--surface);
+  color: var(--primary-strong);
+}
+
+.hero .btn--ghost,
+.band--dark .btn--ghost,
+.band--primary .btn--ghost { color: var(--ink-inverse); }
+.hero .btn--ghost:hover,
+.band--dark .btn--ghost:hover,
+.band--primary .btn--ghost:hover {
+  background: var(--ink-inverse);
+  color: var(--ink);
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* --------------------------------------------------------------------------
+   Tiles — the entry points on the front page. Square, hairline border, no shadow.
+   Reflow with auto-fit rather than breakpoints.
+   -------------------------------------------------------------------------- */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 1px;                      /* the hairline IS the gap: tiles sit flush */
+  background: var(--rule);       /* shows through the 1px gaps as the rule */
+  border: 1px solid var(--rule);
+}
+
+/* Four tiles (the front page since 2026-09-25). auto-fit alone would leave
+   three across and one orphan at the widest content width (4 × 18rem does
+   not fit in 1280px minus the gutters), so this grid steps on the system's
+   two breakpoints instead: stacked on a phone, 2 × 2 from 768px, 4 across
+   from 1024px. */
+.tiles--four { grid-template-columns: 1fr; }
+@media (min-width: 768px) {
+  .tiles--four { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1024px) {
+  .tiles--four { grid-template-columns: repeat(4, 1fr); }
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+  min-height: 13rem;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.tile:hover,
+.tile:focus-visible {
+  background: var(--primary);
+  color: var(--ink-inverse);
+}
+
+.tile__index {
+  font-family: var(--font-sans);
+  font-size: var(--step-xs);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--primary);
+}
+.tile:hover .tile__index,
+.tile:focus-visible .tile__index { color: var(--ink-inverse); opacity: 0.8; }
+
+.tile__title {
+  font-family: var(--font-sans);
+  font-size: var(--step-l);
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.tile__body {
+  font-family: var(--font-serif);
+  font-size: var(--step-s);
+  line-height: 1.6;
+  color: var(--ink-2);
+  margin: 0;
+}
+.tile:hover .tile__body,
+.tile:focus-visible .tile__body { color: var(--ink-inverse); }
+
+/* A tile that is a step, not a link: same look, no hover. */
+.tile--static:hover { background: var(--surface); color: var(--ink); }
+.tile--static:hover .tile__index { color: var(--primary); opacity: 1; }
+.tile--static:hover .tile__body { color: var(--ink-2); }
+
+/* The arrow is decoration; the tile title carries the meaning. */
+.tile__go {
+  margin-top: auto;
+  font-family: var(--font-sans);
+  font-size: var(--step-s);
+  font-weight: 500;
+  color: var(--primary);
+}
+.tile:hover .tile__go,
+.tile:focus-visible .tile__go { color: var(--ink-inverse); }
+
+/* --------------------------------------------------------------------------
+   Footer
+   -------------------------------------------------------------------------- */
+
+.sitefooter {
+  font-size: var(--step-xs);
+}
+
+.sitefooter__inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.sitefooter p { margin: 0; opacity: 0.8; }
+.sitefooter a { color: var(--ink-inverse); }
+
+/* The institutional affiliation gets its own row under the other two lines.
+   `.sitefooter__inner` is space-between, so a third item would otherwise be
+   pulled into the middle of a row where the two existing lines are already
+   pinned left and right. flex-basis: 100% wraps it instead. */
+.sitefooter__affiliation { flex-basis: 100%; }
+
+/* --------------------------------------------------------------------------
+   Principles — a plain list with hairlines, two columns from 768px.
+   -------------------------------------------------------------------------- */
+
+.principles {
+  list-style: none;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0 var(--space-5);
+  border-top: 1px solid var(--rule);
+}
+@media (min-width: 768px) { .principles { grid-template-columns: 1fr 1fr; } }
+.principles li {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--rule);
+  font-family: var(--font-serif);
+  font-size: var(--step-m);
+  line-height: 1.6;
+}
+.principles strong {
+  display: block;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+/* Pages of running text: /om/, /format/, /personvern/. */
+.prose h2 { margin-top: var(--space-5); }
+.prose h3 { margin-top: var(--space-4); font-size: var(--step-m); }
+.prose ul, .prose ol { padding-left: 1.25em; margin: 0 0 var(--space-3); }
+.prose li { margin-bottom: var(--space-1); }
+.prose code, .prose pre { font-family: var(--font-mono); font-size: 0.85em; }
+.prose code { background: var(--paper-2); padding: 0.05em 0.3em; }
+.prose pre {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  padding: var(--space-2) var(--space-3);
+  overflow-x: auto;
+  line-height: 1.5;
+}
+.prose pre code { background: none; padding: 0; }
+.prose table { border-collapse: collapse; width: 100%; font-size: var(--step-s); margin: 0 0 var(--space-3); }
+.prose th, .prose td { text-align: left; vertical-align: top; padding: var(--space-1); border-bottom: 1px solid var(--rule); }
+.prose th { font-family: var(--font-sans); font-weight: 600; }

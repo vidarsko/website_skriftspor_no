@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skriftspor — vis skriveprosessen din</title>
+  <meta name="description" content="Slipp spor-filer her for å se hvordan tekstene ble skrevet, eller start en ny tekst. Ingen konto, ingen server — alt skjer i nettleseren din.">
+  <meta property="og:title" content="Skriftspor — vis skriveprosessen din">
+  <meta property="og:description" content="En enkel skriveblokk som tar vare på hvordan teksten din blir til, og et sted å spille den av igjen. Alt skjer i nettleseren din.">
+  <meta property="og:url" content="https://skriftspor.no/">
+  <meta property="og:type" content="website">
+
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/app.css">
+
+  <script src="/js/header.js" defer></script>
+  <script src="/js/skriftspor.js" defer></script>
+  <script src="/js/replay.js" defer></script>
+  <script src="/js/extract.js" defer></script>
+  <script src="/js/inbox.js" defer></script>
+</head>
+<body>
+
+  <header class="siteheader" data-site-header></header>
+
+  <main>
+
+    <!--
+      THE FIRST THING ON THE SITE (Vidar, 2026-10-18): a drop zone for
+      .spor files and a button to start a new text. Nothing above it.
+      The whole window accepts a drop, not only this band; the band is
+      where the page says so. The page's one loud band.
+    -->
+    <section class="dropband" id="dropband">
+      <div class="dropband__inner">
+        <div class="dropband__zone" id="dropzone">
+          <p class="dropband__title">Slipp spor-filer her</p>
+          <p class="dropband__sub">En fil viser hvordan teksten ble skrevet. Flere filer gir en oversikt over alle innleveringene.</p>
+          <div class="btn-row dropband__actions">
+            <button type="button" class="btn btn--primary" id="pick-files">Velg spor-filer</button>
+            <a class="btn btn--ghost" href="/skriv/">Start ny tekst</a>
+          </div>
+          <p class="dropband__note">Filene leses av nettleseren din og sendes ikke noe sted.</p>
+        </div>
+        <input type="file" id="file-input" accept=".spor,.json,application/json" multiple hidden>
+      </div>
+    </section>
+
+    <p class="inbox__error" id="inbox-error" role="alert" hidden></p>
+
+    <!-- ===== OVERVIEW: shown when more than one file is loaded ===== -->
+    <section class="band" id="overview" hidden>
+      <div class="band__inner">
+        <div class="overview__head">
+          <div>
+            <p class="eyebrow">Oversikt</p>
+            <h1 class="overview__title" id="overview-title">Innleveringer</h1>
+          </div>
+          <div class="btn-row">
+            <button type="button" class="btn btn--ghost" id="add-files">Legg til flere</button>
+            <button type="button" class="btn btn--quiet" id="clear-files">Tøm</button>
+          </div>
+        </div>
+        <p class="overview__hint">Trykk på en innlevering for å spille den av. Trykk på en kolonneoverskrift for å sortere.</p>
+        <div class="tablewrap">
+          <table class="overview" id="overview-table">
+            <thead></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== DETAIL: one submission ===== -->
+    <div id="detail" hidden>
+
+      <section class="band detail__top">
+        <div class="band__inner">
+          <button type="button" class="btn btn--quiet detail__back" id="back" hidden>&larr; Tilbake til oversikten</button>
+          <p class="eyebrow" id="detail-file"></p>
+          <h1 class="detail__title" id="detail-title"></h1>
+          <p class="prose" id="detail-description"></p>
+          <div id="player"></div>
+          <p class="sheet__legend player__legend"><span class="legend-pasted">Blå bakgrunn med prikket strek</span> = innlimt tekst · <span class="legend-fresh">oransje</span> = det som nettopp ble skrevet · <del>gjennomstreket</del> = det som nettopp ble slettet · rull med musehjulet over tidslinja for å spole</p>
+        </div>
+      </section>
+
+      <section class="band band--alt">
+        <div class="band__inner">
+          <p class="eyebrow">Nøkkeltall</p>
+          <dl class="facts" id="detail-facts"></dl>
+          <div class="share" id="detail-share"></div>
+        </div>
+      </section>
+
+      <section class="band">
+        <div class="band__inner">
+          <p class="eyebrow">Sammenligning med innlevert tekst</p>
+          <div id="compare-empty">
+            <h2>Hvor mye av innleveringen er dokumentert?</h2>
+            <p class="prose">Slipp den innleverte teksten her (Word, PDF, OpenDocument eller ren tekst), eller lim den inn.</p>
+            <div class="btn-row">
+              <button type="button" class="btn btn--ghost" id="pick-doc">Velg dokument</button>
+            </div>
+            <details class="drop__paste">
+              <summary>Lim inn teksten i stedet</summary>
+              <label for="paste-doc" class="visually-hidden">Innlevert tekst</label>
+              <textarea id="paste-doc" rows="6" placeholder="Lim inn den innleverte teksten her"></textarea>
+              <button type="button" class="btn btn--ghost" id="paste-compare">Sammenlign</button>
+            </details>
+            <input type="file" id="file-doc" accept=".docx,.odt,.pdf,.txt,.md,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+          </div>
+          <div id="compare-result" hidden>
+            <h2 id="cmp-head"></h2>
+            <p class="prose" id="cmp-lede"></p>
+            <div class="share" id="cmp-share"></div>
+            <p class="cmp__legend">
+              <span class="legend-typed">Skrevet i Skriftspor</span>
+              <span class="legend-pasted">Limt inn i Skriftspor</span>
+              <span class="legend-missing">Ikke i spor-fila</span>
+            </p>
+            <div class="cmp__text" id="cmp-text"></div>
+            <p class="note-small" id="cmp-note"></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="band band--alt">
+        <div class="band__inner">
+          <p class="eyebrow">Kontroller</p>
+          <h2>Er fila hel og uendret?</h2>
+          <ul class="checks" id="detail-checks"></ul>
+          <div class="btn-row">
+            <button type="button" class="btn btn--ghost" id="drand-confirm" hidden>Bekreft tidsstemplene hos drand</button>
+          </div>
+          <p class="note-small" id="drand-result"></p>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- ===== Below the fold: what this is, for a first-time visitor ===== -->
+    <div id="about">
+      <section class="band">
+        <div class="band__inner">
+          <p class="eyebrow">Hva dette er</p>
+          <h2>Et skrivested som husker, ikke en KI-detektor</h2>
+          <div class="prose">
+            <p>Når du skriver i Skriftspor, blir hver innsetting, sletting og innliming tatt vare på med tidspunkt. Det blir til en <em>spor-fil</em> som viser hvordan teksten vokste fram: utkastene, omskrivingene, pausene. Den kan spilles av som en film.</p>
+            <p>Verktøyet er laget for den ærlige eleven. Det skal være lett å vise at du har gjort arbeidet selv. Det overvåker ingen, og det gjetter ikke på om en tekst er skrevet av KI.</p>
+          </div>
+          <ul class="principles">
+            <li><strong>Ingen konto, ingen server.</strong> Teksten din sendes ikke noe sted, og lagres bare i din egen nettleser mens du skriver.</li>
+            <li><strong>Du eier fila.</strong> Spor-fila ligger hos deg. Det er du som velger hvem som får se den.</li>
+            <li><strong>Ingenting skjult.</strong> Spor-fila er en egen, åpen fil, ikke noe som gjemmes i et Word-dokument. <a href="/format/">Formatet er beskrevet</a>, så hvem som helst kan lage sitt eget verktøy for å lese den.</li>
+            <li><strong>Liten og robust.</strong> Bare endringene lagres. Hver økt lagres for seg med sjekksummer, så en skade blir liggende der den er.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="band band--tint">
+        <div class="band__inner band__inner--prose">
+          <p class="eyebrow">Ærlig talt</p>
+          <h2>Hva en spor-fil viser, og hva den ikke viser</h2>
+          <div class="prose">
+            <p>En spor-fil viser hvordan og når en tekst ble bygget opp. Den viser ikke at ingen KI ble brukt: noen kan skrive av en tekst fra en annen skjerm, eller la et program taste for seg. Bruk avspillingen som utgangspunkt for en samtale, ikke som en dom.</p>
+            <p><a href="/om/">Les mer om hva verktøyet kan og ikke kan</a></p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+  </main>
+
+  <footer class="band band--dark sitefooter">
+    <div class="band__inner sitefooter__inner">
+      <p>Skriftspor — vis skriveprosessen din. Laget av Vidar Skogvoll.</p>
+      <p><a href="/personvern/">Personvern</a> · <a href="/format/">Filformatet</a></p>
+    </div>
+  </footer>
+
+  <div class="dragcover" id="dragcover" aria-hidden="true" hidden><p>Slipp filene for å åpne dem</p></div>
+
+</body>
+</html>
