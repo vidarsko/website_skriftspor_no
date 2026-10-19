@@ -437,6 +437,17 @@
     if (window.SkriftsporInbox) window.SkriftsporInbox.loadLocal();
   });
 
+  /* Leaving the page with changes that are not in a downloaded spor-file.
+     The text is safe in this browser either way, but a student on a shared
+     or wiped school computer loses it — so the browser asks first. Browsers
+     show their own wording; the text here is ignored by all of them. */
+  window.addEventListener('beforeunload', function (e) {
+    if (locked || !state.text || doc.changedAt <= doc.downloadedAt) return;
+    save();
+    e.preventDefault();
+    e.returnValue = '';
+  });
+
   /* Ctrl/Cmd+S downloads the file rather than saving the web page. */
   document.addEventListener('keydown', function (e) {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && document.body.getAttribute('data-view') === 'write') { e.preventDefault(); download(); }
