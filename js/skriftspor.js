@@ -71,7 +71,8 @@
   /* insert costs O(number of runs), not O(length of text).               */
   /*   run = { n: length, p: 0 typed | 1 pasted | 2 unknown, s: session, */
   /*           f: formatting bits — 1 bold, 2 italic, 4 underline,        */
-  /*              8 heading (set on every character of a heading line) } */
+  /*              8 heading 1, 16 heading 2, 32 heading 3 (set on every   */
+  /*              character of a heading line; at most one of the three) } */
   /* ------------------------------------------------------------------ */
 
   function Spans(runs) { this.runs = runs || []; }
@@ -422,6 +423,7 @@
               'står i klartekst her. Selve loggen er komprimert, én økt om gangen, og kan spilles av på ' +
               'skriftspor.no ved å slippe fila der. Formatet er beskrevet på ' + SPEC_URL,
             title: doc.title || '',
+            author: doc.author || '',
             summary: summary,
             text: doc.text,
             text_sha256: th,
@@ -777,16 +779,26 @@
   /* The local working copy → a complete file object. */
   function fileFromLocal(doc) {
     return finalize(doc.sessions || []).then(function (f) {
-      return buildFile({ title: doc.title, closed: f.sessions, open: null, text: f.state.text });
+      return buildFile({ title: doc.title, author: doc.author, closed: f.sessions, open: null, text: f.state.text });
     });
   }
 
-  function fileName(title) {
-    var base = (title || 'tekst').toLowerCase()
+  function slug(x) {
+    return (x || '').toLowerCase()
       .replace(/[æ]/g, 'ae').replace(/[øö]/g, 'o').replace(/[åä]/g, 'a')
-      .normalize('NFKD').replace(/[̀-ͯ]/g, '')
-      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'tekst';
-    return base + '.spor';
+      .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 50);
+  }
+
+  /* YYYY-MM-DD-HH-MM-SS-navn-tittel.spor, stamped with the moment of the
+     download (Vidar, 2026-10-19): a student who downloads as they go gets
+     a folder of files that sort by time and say whose and what they are. */
+  function fileName(author, title, ext, when) {
+    var d = when || new Date();
+    var p = function (n) { return String(n).padStart(2, '0'); };
+    var stamp = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '-' +
+                p(d.getHours()) + '-' + p(d.getMinutes()) + '-' + p(d.getSeconds());
+    return [stamp, slug(author), slug(title) || 'tekst'].filter(Boolean).join('-') + (ext || '.spor');
   }
 
   /* ------------------------------------------------------------------ */

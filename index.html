@@ -18,6 +18,7 @@
   <script src="/js/skriftspor.js" defer></script>
   <script src="/js/replay.js" defer></script>
   <script src="/js/extract.js" defer></script>
+  <script src="/js/docx.js" defer></script>
   <script src="/js/write.js" defer></script>
   <script src="/js/inbox.js" defer></script>
 </head>
@@ -67,10 +68,13 @@
           <div class="writebar__title">
             <label for="write-title" class="visually-hidden">Tittel</label>
             <input id="write-title" class="writebar__titleinput" type="text" placeholder="Tittel" autocomplete="off" maxlength="120">
+            <label for="write-author" class="visually-hidden">Navn</label>
+            <input id="write-author" class="writebar__authorinput" type="text" placeholder="Navn" autocomplete="name" maxlength="80">
             <p id="write-status" class="writebar__status" role="status"></p>
           </div>
           <div class="btn-row writebar__actions">
             <button type="button" id="btn-download" class="btn btn--primary">Last ned spor-fil</button>
+            <button type="button" id="btn-docx" class="btn btn--ghost">Last ned .docx</button>
             <button type="button" id="btn-copy" class="btn btn--ghost">Kopier</button>
             <button type="button" id="btn-play" class="btn btn--ghost">Spill av</button>
             <button type="button" id="btn-resume" class="btn btn--quiet">Åpne spor-fil</button>
@@ -83,12 +87,15 @@
       <section class="band writearea">
         <div class="band__inner writearea__inner">
           <div class="formatbar" role="toolbar" aria-label="Formatering">
-            <button type="button" class="formatbar__btn" data-format="heading" title="Overskrift" aria-label="Overskrift" aria-pressed="false">H</button>
+            <button type="button" class="formatbar__btn formatbar__btn--h" data-format="h1" title="Overskrift 1" aria-label="Overskrift 1" aria-pressed="false">H1</button>
+            <button type="button" class="formatbar__btn formatbar__btn--h" data-format="h2" title="Overskrift 2" aria-label="Overskrift 2" aria-pressed="false">H2</button>
+            <button type="button" class="formatbar__btn formatbar__btn--h" data-format="h3" title="Overskrift 3" aria-label="Overskrift 3" aria-pressed="false">H3</button>
             <button type="button" class="formatbar__btn" data-format="bold" title="Fet (Ctrl+B)" aria-label="Fet" aria-pressed="false"><b>B</b></button>
             <button type="button" class="formatbar__btn" data-format="italic" title="Kursiv (Ctrl+I)" aria-label="Kursiv" aria-pressed="false"><i>I</i></button>
             <button type="button" class="formatbar__btn" data-format="underline" title="Understreket (Ctrl+U)" aria-label="Understreket" aria-pressed="false"><u>U</u></button>
           </div>
           <div class="sheet">
+            <nav class="toc" id="toc" aria-label="Innhold"></nav>
             <div id="write-input" class="sheet__input" role="textbox" aria-multiline="true" aria-label="Teksten din" spellcheck="true" lang="nb"></div>
           </div>
           <div class="sheet__foot">
@@ -176,6 +183,19 @@
     </div>
 
   </main>
+
+  <!-- Asked when a new text is started. Both can be changed later in the bar. -->
+  <dialog class="meta" id="meta">
+    <form method="dialog" class="meta__form">
+      <h2 class="meta__title">Ny tekst</h2>
+      <label class="meta__field">Navn<input id="meta-author" type="text" autocomplete="name" maxlength="80" required></label>
+      <label class="meta__field">Tittel<input id="meta-title" type="text" autocomplete="off" maxlength="120" required></label>
+      <div class="btn-row">
+        <button type="submit" class="btn btn--primary" value="ok">Start</button>
+        <button type="submit" class="btn btn--quiet" value="cancel" formnovalidate>Avbryt</button>
+      </div>
+    </form>
+  </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   <div class="dragcover" id="dragcover" aria-hidden="true" hidden><p>Slipp filene</p></div>

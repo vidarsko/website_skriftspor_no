@@ -31,11 +31,15 @@
   var CURSOR_DEBOUNCE_MS = 400;
   var UNDO_MERGE_MS = 1000;
 
-  var BOLD = 1, ITALIC = 2, UNDERLINE = 4, HEADING = 8;
-  var BITS = { bold: BOLD, italic: ITALIC, underline: UNDERLINE, heading: HEADING };
+  var BOLD = 1, ITALIC = 2, UNDERLINE = 4, H1 = 8, H2 = 16, H3 = 32, HMASK = H1 | H2 | H3;
+  var BITS = { bold: BOLD, italic: ITALIC, underline: UNDERLINE, h1: H1, h2: H2, h3: H3 };
+  function level(f) { return f & H1 ? 1 : f & H2 ? 2 : f & H3 ? 3 : 0; }
 
   var ed = document.getElementById('write-input');
   var titleInput = document.getElementById('write-title');
+  var authorInput = document.getElementById('write-author');
+  var metaDialog = document.getElementById('meta');
+  var tocEl = document.getElementById('toc');
   var statusEl = document.getElementById('write-status');
   var statsEl = document.getElementById('write-stats');
   var toast = document.getElementById('toast');
@@ -59,7 +63,7 @@
     return c && c.raw ? c.raw : null;
   }
   function emptyDoc() {
-    return { v: 1, title: '', sessions: [], savedAt: 0, downloadedAt: 0, changedAt: 0 };
+    return { v: 1, title: '', author: '', sessions: [], savedAt: 0, downloadedAt: 0, changedAt: 0 };
   }
 
   /* ---- Recording ------------------------------------------------------- */
@@ -192,14 +196,19 @@
     if (!ready || locked) return;
     var sel = getSel();
     var bit = BITS[kind];
-    if (kind === 'heading') {
+    if (bit & HMASK) {
       var a = lineStart(sel[0]), b = lineEnd(sel[1]);
       if (a === b) {   /* empty line: the heading applies to what is typed next */
-        pending = { at: a, f: formatFor(a) ^ HEADING };
+        var pf = formatFor(a);
+        pending = { at: a, f: (pf & ~HMASK) | ((pf & bit) ? 0 : bit) };
         render(sel);
         return;
       }
-      edit([['f', a, b, HEADING, (state.spans.formatAt(a) & HEADING) ? 0 : 1]], 'format');
+      var cur = state.spans.formatAt(a) & HMASK;
+      var steps = [];
+      if (cur) steps.push(['f', a, b, cur, 0]);
+      if (cur !== bit) steps.push(['f', a, b, bit, 1]);
+      edit(steps, 'format');
       render(sel);
       return;
     }
@@ -223,8 +232,7 @@
     var html = '', at = 0, ri = 0, rOff = 0;
     for (var li = 0; li < lines.length; li++) {
       var end = at + lines[li].length, inner = '';
-      var heading = end > at ? !!(state.spans.formatAt(at) & HEADING)
-                             : !!(pending && pending.at === at && pending.f & HEADING);
+      var lvl = level(end > at ? state.spans.formatAt(at) : (pending && pending.at === at ? pending.f : 0));
       var pos = at;
       while (pos < end) {
         while (ri < runs.length && rOff + runs[ri].n <= pos) { rOff += runs[ri].n; ri++; }
@@ -237,13 +245,16 @@
         inner += '<span' + (cls.length ? ' class="' + cls.join(' ') + '"' : '') + '>' + esc(text.slice(pos, stop)) + '</span>';
         pos = stop;
       }
-      html += '<div class="ln' + (heading ? ' ln--h' : '') + '">' + (inner || '<br>') + '</div>';
+      html += '<div class="ln' + (lvl ? ' ln--h' + lvl : '') + '">' + (inner || '<br>') + '</div>';
       at = end + 1;
     }
+    var top = ed.scrollTop;
     ed.innerHTML = html;
-    if (sel && document.activeElement === ed) setSel(sel[0], sel[1]);
+    ed.scrollTop = top;
+    if (sel && document.activeElement === ed) { setSel(sel[0], sel[1]); caretIntoView(); }
     stats();
     syncButtons();
+    buildToc();
   }
 
   /* ---- Positions: sheet ↔ model ------------------------------------------ */
@@ -369,7 +380,7 @@
     var sel = getSel();
     var f = formatFor(sel[0]);
     if (str === '\n') f = 0;                 /* Enter: the new line starts plain */
-    else if (kind === 'p') f &= ~HEADING;
+    else if (kind === 'p') f &= ~HMASK;
     var steps = [];
     if (sel[1] > sel[0]) steps.push(['d', sel[0], state.text.slice(sel[0], sel[1])]);
     steps.push([kind, sel[0], str, f]);
@@ -503,12 +514,12 @@
   function syncButtons() {
     var sel = getSel(), f;
     if (sel[1] > sel[0]) {
-      f = 15;
+      f = 63;
       state.spans.slice(sel[0], sel[1]).forEach(function (r) { f &= r.f || 0; });
     } else f = formatFor(sel[0]);
     if (sel[1] === sel[0]) {
       var ls = lineStart(sel[0]);
-      if (ls < lineEnd(sel[0]) && state.spans.formatAt(ls) & HEADING) f |= HEADING;
+      if (ls < lineEnd(sel[0])) f = (f & ~HMASK) | (state.spans.formatAt(ls) & HMASK);
     }
     [].forEach.call(document.querySelectorAll('[data-format]'), function (btn) {
       btn.setAttribute('aria-pressed', f & BITS[btn.getAttribute('data-format')] ? 'true' : 'false');
@@ -537,11 +548,103 @@
         inner += seg;
         at += r.n;
       });
-      var h = line.length && (state.spans.formatAt(pos) & HEADING);
-      out += h ? '<h2>' + inner + '</h2>' : '<p>' + (inner || '<br>') + '</p>';
+      var h = line.length ? level(state.spans.formatAt(pos)) : 0;
+      out += h ? '<h' + h + '>' + inner + '</h' + h + '>' : '<p>' + (inner || '<br>') + '</p>';
       pos = end + 1;
     });
     return out;
+  }
+
+  /* The model as paragraphs for js/docx.js. */
+  function paragraphs() {
+    var text = state.text, pos = 0, out = [];
+    text.split('\n').forEach(function (line) {
+      var end = pos + line.length, at = pos, runs = [];
+      state.spans.slice(pos, end).forEach(function (r) {
+        runs.push({ text: text.substr(at, r.n), b: !!(r.f & BOLD), i: !!(r.f & ITALIC), u: !!(r.f & UNDERLINE) });
+        at += r.n;
+      });
+      out.push({ level: line.length ? level(state.spans.formatAt(pos)) : 0, runs: runs });
+      pos = end + 1;
+    });
+    return out;
+  }
+
+  function saveBlob(blob, name) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+  }
+
+  function downloadDocx() {
+    save();
+    saveBlob(window.SkriftsporDocx.build({ title: doc.title, author: doc.author, paragraphs: paragraphs() }),
+      S.fileName(doc.author, doc.title, '.docx'));
+  }
+
+  /* ---- Scrolling: the sheet scrolls inside itself ------------------------ */
+
+  function caretIntoView() {
+    var s = window.getSelection();
+    if (!s.rangeCount) return;
+    var r = s.getRangeAt(0).getClientRects()[0] || (s.focusNode && s.focusNode.nodeType === 1 ? s.focusNode.getBoundingClientRect() : null);
+    if (!r) return;
+    var box = ed.getBoundingClientRect();
+    if (r.bottom > box.bottom - 24) ed.scrollTop += r.bottom - box.bottom + 48;
+    else if (r.top < box.top + 24) ed.scrollTop -= box.top - r.top + 48;
+  }
+
+  /* ---- Table of contents, shown while scrolling ------------------------- */
+
+  var tocTimer = null, tocHover = false;
+  function buildToc() {
+    var items = [], lines = ed.childNodes;
+    for (var i = 0; i < lines.length; i++) {
+      var m = /ln--h(\d)/.exec(lines[i].className);
+      if (m) items.push('<li class="toc__item toc__item--' + m[1] + '"><button type="button" data-line="' + i + '">' + esc(lines[i].textContent) + '</button></li>');
+    }
+    tocEl.innerHTML = items.length ? '<ol>' + items.join('') + '</ol>' : '';
+    if (!items.length) tocEl.classList.remove('is-visible');
+  }
+  function showToc() {
+    if (!tocEl.innerHTML || ed.scrollHeight <= ed.clientHeight + 40) return;
+    tocEl.classList.add('is-visible');
+    clearTimeout(tocTimer);
+    tocTimer = setTimeout(function () { if (!tocHover) tocEl.classList.remove('is-visible'); }, 1500);
+  }
+  ed.addEventListener('scroll', showToc);
+  tocEl.addEventListener('mouseenter', function () { tocHover = true; clearTimeout(tocTimer); });
+  tocEl.addEventListener('mouseleave', function () { tocHover = false; showToc(); });
+  tocEl.addEventListener('mousedown', function (e) { e.preventDefault(); });
+  tocEl.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-line]');
+    if (!btn) return;
+    var line = ed.childNodes[+btn.getAttribute('data-line')];
+    if (line) ed.scrollTop = line.offsetTop - 16;
+  });
+
+  /* ---- Name and title, asked for when a new text is started ------------- */
+
+  function askMeta(done) {
+    var name = document.getElementById('meta-author'), title = document.getElementById('meta-title');
+    name.value = doc.author || '';
+    title.value = doc.title || '';
+    metaDialog.returnValue = '';
+    metaDialog.showModal();
+    metaDialog.addEventListener('close', function onClose() {
+      metaDialog.removeEventListener('close', onClose);
+      if (metaDialog.returnValue !== 'ok') return;
+      doc.author = name.value.trim();
+      doc.title = title.value.trim();
+      authorInput.value = doc.author;
+      titleInput.value = doc.title;
+      save();
+      done();
+    });
   }
 
   function copyText() {
@@ -590,6 +693,7 @@
   function save() {
     if (locked) return;
     doc.title = titleInput.value;
+    doc.author = authorInput.value;
     doc.savedAt = Date.now();
     if (!S.local.save(doc)) {
       statusEl.textContent = 'Kan ikke lagre i nettleseren. Last ned spor-fila ofte.';
@@ -614,14 +718,7 @@
   function download() {
     save();
     S.fileFromLocal(doc).then(function (file) {
-      var blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' });
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = S.fileName(doc.title);
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+      saveBlob(new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' }), S.fileName(doc.author, doc.title));
       doc.downloadedAt = Date.now();
       save();
     }).catch(function (e) {
@@ -635,6 +732,7 @@
     state = new S.State('');
     undoStack = []; redoStack = []; lastGroup = null; pending = null;
     titleInput.value = '';
+    authorInput.value = '';
     render();
     status();
   }
@@ -657,11 +755,13 @@
             !confirm('Du har en tekst i nettleseren som ikke er lastet ned. Vil du erstatte den med teksten fra fila?')) return;
         doc = emptyDoc();
         doc.title = parsed.title || '';
+        doc.author = parsed.author || '';
         doc.sessions = parsed.sessions.map(function (s) { return { stored: s }; });
         doc.downloadedAt = doc.changedAt = Date.now();
         state = rep.replay.state;
         undoStack = []; redoStack = []; lastGroup = null; pending = null;
         titleInput.value = doc.title;
+        authorInput.value = doc.author;
         save();
         ed.focus();
         render([state.text.length, state.text.length]);
@@ -681,10 +781,14 @@
   /* ---- Wiring ------------------------------------------------------------ */
 
   titleInput.addEventListener('input', scheduleSave);
+  authorInput.addEventListener('input', scheduleSave);
+  document.getElementById('btn-docx').addEventListener('click', downloadDocx);
   document.getElementById('btn-download').addEventListener('click', download);
   document.getElementById('btn-copy').addEventListener('click', copyText);
   document.getElementById('btn-new').addEventListener('click', function () {
-    if (confirmDiscard()) { reset(); ed.focus(); }
+    if (!confirmDiscard()) return;
+    reset();
+    askMeta(function () { ed.focus(); });
   });
   document.getElementById('btn-resume').addEventListener('click', function () { fileInput.click(); });
   fileInput.addEventListener('change', function () { if (fileInput.files[0]) resume(fileInput.files[0]); fileInput.value = ''; });
@@ -714,6 +818,7 @@
 
   doc = S.local.load() || emptyDoc();
   titleInput.value = doc.title || '';
+  authorInput.value = doc.author || '';
   ed.contentEditable = 'false';
   S.finalize(doc.sessions).then(function (f) {
     state = f.state;
@@ -740,10 +845,13 @@
       ed.focus();
       render([state.text.length, state.text.length]);
     },
-    startNew: function () {
-      if (!confirmDiscard()) return false;
-      if (state.text) reset();
-      return true;
+    /* Confirms discarding the current text, asks for name and title,
+       then calls done(). Cancelling the questions keeps everything as it was
+       only if there was no text; a discarded text is gone either way. */
+    startNew: function (done) {
+      if (!confirmDiscard()) return;
+      if (state.text || doc.sessions.length) reset();
+      askMeta(done);
     }
   };
 

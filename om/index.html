@@ -23,10 +23,11 @@
 
   <main>
     <section class="band">
-      <div class="band__inner band__inner--prose">
+      <div class="band__inner">
         <h1>Om siden</h1>
         <div class="prose">
           <p>Skriftspor tar vare på hvordan en tekst blir til. Mens du skriver, lagres hver innsetting, sletting, innliming og formatering med tidspunkt. Du laster ned dette som en spor-fil og velger selv hvem som får den. Den som får fila, kan spille av skrivingen og sammenligne den med teksten som ble levert.</p>
+          <p><strong>Ingenting lagres permanent på siden. Last ned spor-fila underveis</strong>, for eksempel hver gang du tar en pause. Hver nedlasting får dato og klokkeslett i filnavnet, så den nyeste er lett å finne. Med spor-fila kan du skrive videre på hvilken som helst maskin.</p>
           <p>En spor-fil viser hvordan og når en tekst ble skrevet. Den beviser ikke at ingen KI ble brukt: noen kan skrive av en tekst fra en annen skjerm eller la et program taste for seg, og en teknisk flink person kan lage en falsk fil, siden det ikke finnes noen hemmelig nøkkel. Bruk avspillingen som grunnlag for en samtale, ikke som en dom.</p>
           <p>Skriftspor er laget av Vidar Skogvoll.</p>
         </div>
@@ -34,7 +35,7 @@
     </section>
 
     <section class="band band--alt" id="personvern">
-      <div class="band__inner band__inner--prose">
+      <div class="band__inner">
         <h2>Personvern</h2>
         <div class="prose">
           <p>Skriftspor er en samling statiske filer. Det finnes ingen server som tar imot tekst, ingen konto og ingen database. Ingenting av det du skriver eller laster inn, sendes noe sted.</p>
@@ -69,19 +70,20 @@
     </section>
 
     <section class="band" id="filformat">
-      <div class="band__inner band__inner--prose">
+      <div class="band__inner">
         <h2>Filformatet, versjon 1</h2>
         <div class="prose">
 <!-- Generert fra FORMAT.md 2026-10-19. Endres FORMAT.md, endres denne også. -->
 <p>Spor-fila fra <a href="https://skriftspor.no">skriftspor.no</a> er åpen og dokumentert, slik at hvem som helst kan lese den og lage sin egen verifikator. Referanseimplementasjonen er <a href="/js/skriftspor.js"><code>js/skriftspor.js</code></a>, lesbar JavaScript uten avhengigheter. Der koden og denne beskrivelsen er uenige, er det en feil.</p>
 <h3>Oversikt</h3>
-<p>Fila er UTF-8-kodet JSON, og navnet slutter på <code>.spor</code>. Øverst står et kort sammendrag og hele slutteksten i klartekst, så teksten overlever selv om loggen skades. Selve loggen er delt i økter. Hver økt er komprimert for seg og har egne sjekksummer, så skade i én økt ikke ødelegger de andre.</p>
+<p>Fila er UTF-8-kodet JSON, og navnet slutter på <code>.spor</code>. Skriftspor gir den navnet <code>ÅÅÅÅ-MM-DD-TT-MM-SS-navn-tittel.spor</code>, med tidspunktet for nedlastingen, men et leseprogram skal ikke stole på navnet. <code>title</code> og <code>author</code> er det skriveren selv har fylt inn (kan være tomme). Øverst står et kort sammendrag og hele slutteksten i klartekst, så teksten overlever selv om loggen skades. Selve loggen er delt i økter. Hver økt er komprimert for seg og har egne sjekksummer, så skade i én økt ikke ødelegger de andre.</p>
 <pre><code class="language-json">{
   &quot;format&quot;: &quot;skriftspor&quot;,
   &quot;version&quot;: 1,
   &quot;spec&quot;: &quot;https://skriftspor.no/om/#filformat&quot;,
   &quot;readme&quot;: &quot;Dette er en spor-fil fra skriftspor.no …&quot;,
   &quot;title&quot;: &quot;Min tekst&quot;,
+  &quot;author&quot;: &quot;Navn Navnesen&quot;,
   &quot;summary&quot;: { &quot;…&quot;: &quot;…&quot; },
   &quot;text&quot;: &quot;Hele slutteksten …&quot;,
   &quot;text_sha256&quot;: &quot;…&quot;,
@@ -205,7 +207,7 @@
 <p><strong>Posisjoner teller UTF-16-kodeenheter</strong>, slik JavaScript-strenger og nettleserens tekstfelt gjør. En leser i et annet språk må gjøre det samme, ellers vil for eksempel en emoji forskyve alle posisjoner etter den med én.</p>
 <p>Å bytte ut merket tekst gir to hendelser med samme tidspunkt: en sletting, så en innsetting.</p>
 <h4>Formatering</h4>
-<p>Formatering er ikke en del av teksten. Den er et sett biter per tegn: <code>1</code> fet, <code>2</code> kursiv, <code>4</code> understreket og <code>8</code> overskrift. Overskrift settes på alle tegnene i en linje, og en linje er en overskrift hvis det første tegnet har biten. Nye tegn får bitene i <code>fmt</code> på innsettingen (mangler den, er den 0). <code>"f"</code>-hendelser endrer bitene for et område.</p>
+<p>Formatering er ikke en del av teksten. Den er et sett biter per tegn: <code>1</code> fet, <code>2</code> kursiv, <code>4</code> understreket, <code>8</code> overskrift 1, <code>16</code> overskrift 2 og <code>32</code> overskrift 3. Overskrift settes på alle tegnene i en linje (høyst ett av de tre nivåene), og en linjes nivå er det første tegnets. Nye tegn får bitene i <code>fmt</code> på innsettingen (mangler den, er den 0). <code>"f"</code>-hendelser endrer bitene for et område.</p>
 <p>En leser som bare trenger teksten, kan overse <code>fmt</code> og <code>"f"</code>-hendelser helt. <code>text</code> er alltid ren tekst uten formateringstegn.</p>
 <h4>Å spille av</h4>
 <p>Start med tom tekst og bruk hendelsene i rekkefølge, økt for økt. Etter hver økt skal SHA-256 av teksten være lik <code>text_end_sha256</code>, og etter siste økt skal teksten være lik <code>text</code>. En sletting av tekst som ikke står der, betyr at loggen er skadd eller endret.</p>

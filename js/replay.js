@@ -316,7 +316,9 @@
       if (f & 1) cls.push('f-b');
       if (f & 2) cls.push('f-i');
       if (f & 4) cls.push('f-u');
-      if (f & 8) cls.push('f-h');
+      if (f & 8) cls.push('f-h1');
+      if (f & 16) cls.push('f-h2');
+      if (f & 32) cls.push('f-h3');
       var seg = esc(st.text.slice(from, to));
       html += cls.length ? '<span class="' + cls.join(' ') + '">' + seg + '</span>' : seg;
     }

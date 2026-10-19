@@ -4,7 +4,7 @@ Spor-fila fra [skriftspor.no](https://skriftspor.no) er åpen og dokumentert, sl
 
 ## Oversikt
 
-Fila er UTF-8-kodet JSON, og navnet slutter på `.spor`. Øverst står et kort sammendrag og hele slutteksten i klartekst, så teksten overlever selv om loggen skades. Selve loggen er delt i økter. Hver økt er komprimert for seg og har egne sjekksummer, så skade i én økt ikke ødelegger de andre.
+Fila er UTF-8-kodet JSON, og navnet slutter på `.spor`. Skriftspor gir den navnet `ÅÅÅÅ-MM-DD-TT-MM-SS-navn-tittel.spor`, med tidspunktet for nedlastingen, men et leseprogram skal ikke stole på navnet. `title` og `author` er det skriveren selv har fylt inn (kan være tomme). Øverst står et kort sammendrag og hele slutteksten i klartekst, så teksten overlever selv om loggen skades. Selve loggen er delt i økter. Hver økt er komprimert for seg og har egne sjekksummer, så skade i én økt ikke ødelegger de andre.
 
 ```json
 {
@@ -13,6 +13,7 @@ Fila er UTF-8-kodet JSON, og navnet slutter på `.spor`. Øverst står et kort s
   "spec": "https://skriftspor.no/om/#filformat",
   "readme": "Dette er en spor-fil fra skriftspor.no …",
   "title": "Min tekst",
+  "author": "Navn Navnesen",
   "summary": { "…": "…" },
   "text": "Hele slutteksten …",
   "text_sha256": "…",
@@ -96,7 +97,7 @@ En hendelse er en kort liste. Første element er alltid antall millisekunder sid
 
 ### Formatering
 
-Formatering er ikke en del av teksten. Den er et sett biter per tegn: `1` fet, `2` kursiv, `4` understreket og `8` overskrift. Overskrift settes på alle tegnene i en linje, og en linje er en overskrift hvis det første tegnet har biten. Nye tegn får bitene i `fmt` på innsettingen (mangler den, er den 0). `"f"`-hendelser endrer bitene for et område.
+Formatering er ikke en del av teksten. Den er et sett biter per tegn: `1` fet, `2` kursiv, `4` understreket, `8` overskrift 1, `16` overskrift 2 og `32` overskrift 3. Overskrift settes på alle tegnene i en linje (høyst ett av de tre nivåene), og en linjes nivå er det første tegnets. Nye tegn får bitene i `fmt` på innsettingen (mangler den, er den 0). `"f"`-hendelser endrer bitene for et område.
 
 En leser som bare trenger teksten, kan overse `fmt` og `"f"`-hendelser helt. `text` er alltid ren tekst uten formateringstegn.
 

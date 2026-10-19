@@ -70,6 +70,8 @@
         return '<span class="ov__title">' + esc(f.report.file.title || 'Uten tittel') + '</span>' +
                '<span class="ov__file">' + esc(f.name) + '</span>';
       } },
+    { key: 'author', label: 'Navn', value: function (f) { return (f.report.file.author || '').toLowerCase(); },
+      html: function (f) { return esc(f.report.file.author || '—'); } },
     { key: 'first', label: 'Første tastetrykk', value: function (f) { return f.report.summary.first_event || ''; },
       html: function (f) { return date(f.report.summary.first_event); } },
     { key: 'last', label: 'Siste tastetrykk', value: function (f) { return f.report.summary.last_event || ''; },
@@ -229,7 +231,7 @@
 
     $('back').hidden = files.length < 2 && f.key !== 'lokal';
     $('back').innerHTML = f.key === 'lokal' ? '&larr; Tilbake til teksten' : '&larr; Oversikt';
-    $('detail-file').textContent = f.name;
+    $('detail-file').textContent = (rep.file.author ? rep.file.author + ' · ' : '') + f.name;
     $('detail-title').textContent = rep.file.title || 'Uten tittel';
 
     if (player) player.pause();
@@ -361,7 +363,7 @@
   });
 
   $('start-new').addEventListener('click', function () {
-    if (window.SkriftsporWriter.startNew()) showWrite('push');
+    window.SkriftsporWriter.startNew(function () { showWrite('push'); });
   });
   $('continue-local').addEventListener('click', function () { showWrite('push'); });
   $('home').addEventListener('click', function (e) {
