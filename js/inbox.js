@@ -1,6 +1,9 @@
 /* ==========================================================================
    inbox.js — the front page as the teacher's (and student's) desk.
 
+   The page's views: start (drop zone), write (js/write.js), overview,
+   detail. This file switches between them.
+
    Drop one or more .spor files anywhere on the window:
      one file   → straight to that submission: replay first, then numbers,
                   comparison with the handed-in text, and the checks
@@ -98,9 +101,7 @@
 
     if (docs.length) {
       if (current && docs.length === 1 && !spor.length) { loadDocument(docs[0]); return; }
-      showError(current
-        ? 'Slipp én innlevert tekst om gangen.'
-        : 'Bare spor-filer kan slippes her. Åpne en innlevering først, så kan du slippe den innleverte teksten der for å sammenligne.');
+      showError(current ? 'Slipp én tekst om gangen.' : 'Bare spor-filer (.spor) kan slippes her.');
       if (!spor.length) return;
     }
 
@@ -131,7 +132,7 @@
   function loadLocal() {
     var doc = S.local.load();
     if (!doc || !doc.sessions || !doc.sessions.length) {
-      showError('Det er ingen tekst lagret i denne nettleseren ennå. Trykk «Start ny tekst» for å begynne.');
+      showError('Ingen tekst i denne nettleseren ennå.');
       return;
     }
     S.fileFromLocal(doc).then(function (file) {
@@ -139,18 +140,36 @@
     }).then(function (rep) {
       var f = { id: nextId++, key: 'lokal', name: 'teksten i denne nettleseren', report: rep, submitted: null };
       files = files.filter(function (x) { return x.key !== 'lokal'; }).concat([f]);
-      openDetail(f, 'replace');
+      openDetail(f, 'push');
     }).catch(function (e) { showError('Teksten i nettleseren kunne ikke leses: ' + e.message); });
   }
 
   /* ---- Views ------------------------------------------------------------ */
 
   function setView(view) {
+    document.body.setAttribute('data-view', view);
     $('overview').hidden = view !== 'overview';
     $('detail').hidden = view !== 'detail';
-    $('about').hidden = view !== 'start';
-    document.body.classList.toggle('has-files', view !== 'start');
+    $('write').hidden = view !== 'write';
+    $('dropband').hidden = view === 'write';
+    document.body.classList.toggle('has-files', view === 'overview' || view === 'detail');
     if (view !== 'detail' && player) { player.pause(); }
+    if (view === 'start') syncStart();
+  }
+
+  /* «Fortsett teksten din» only when there is a text in this browser. */
+  function syncStart() {
+    var w = window.SkriftsporWriter;
+    var has = !!(w && w.hasText());
+    $('continue-local').hidden = !has;
+    if (has) $('continue-local').textContent = w.title() ? 'Fortsett «' + w.title() + '»' : 'Fortsett teksten din';
+  }
+
+  function showWrite(how) {
+    current = null;
+    if (how === 'push') history.pushState({ view: 'write' }, '', '#skriv');
+    setView('write');
+    window.SkriftsporWriter.show();
   }
 
   function showOverview(how) {
@@ -208,10 +227,10 @@
     setView('detail');
     var rep = f.report, s = rep.summary;
 
-    $('back').hidden = files.length < 2;
+    $('back').hidden = files.length < 2 && f.key !== 'lokal';
+    $('back').innerHTML = f.key === 'lokal' ? '&larr; Tilbake til teksten' : '&larr; Oversikt';
     $('detail-file').textContent = f.name;
     $('detail-title').textContent = rep.file.title || 'Uten tittel';
-    $('detail-description').textContent = s.description;
 
     if (player) player.pause();
     player = new window.SkriftsporReplay($('player'), rep.replay.sessions, { controls: true, speed: 30 });
@@ -272,7 +291,7 @@
       f.submitted = r;
       if (current === f) renderCompare();
     }).catch(function (e) {
-      showError('Dokumentet kunne ikke leses: ' + e.message + '. Prøv å lagre det som PDF eller lim inn teksten.');
+      showError('Dokumentet kunne ikke leses: ' + e.message + '.');
     });
   }
 
@@ -284,11 +303,6 @@
     var st = f.report.replay.state;
     var c = S.compare(st.text, st.spans.flags(), sub.text);
     $('cmp-head').textContent = S.fmtPct(c.percent) + ' av den innleverte teksten finnes i spor-fila';
-    $('cmp-lede').textContent =
-      'Av ' + c.words + ' ord i «' + sub.name + '» er ' + c.covered + ' dokumentert: ' +
-      c.coveredTyped + ' skrevet i Skriftspor og ' + c.coveredPasted + ' limt inn der. ' +
-      (c.words - c.covered) + ' ord finnes ikke i spor-fila, og ' + S.fmtPct(Math.round((100 - c.docPercentUsed) * 10) / 10) +
-      ' av den dokumenterte teksten er ikke med i innleveringen.';
     shareBar($('cmp-share'), [
       { cls: 'typed', pct: c.percentTyped, label: 'skrevet i Skriftspor' },
       { cls: 'pasted', pct: c.percentPasted, label: 'limt inn i Skriftspor' },
@@ -303,10 +317,6 @@
       at = m.b;
     });
     $('cmp-text').innerHTML = html + esc(t.slice(at));
-    $('cmp-note').textContent =
-      'Sammenligningen ser bare på ordene, i grupper på fire. Store og små bokstaver, tegnsetting, linjeskift og formatering teller ikke, ' +
-      'og avsnitt som er flyttet rundt i Word regnes fortsatt som dokumentert. Overskrifter, kildeliste og små rettelser gjort etterpå ' +
-      'vil vanligvis vises som «ikke i spor-fila» — det er forventet. ' + (sub.note || '');
   }
 
   /* ---- Wiring ----------------------------------------------------------- */
@@ -332,37 +342,63 @@
   $('drand-confirm').addEventListener('click', function () {
     var btn = this;
     btn.disabled = true;
-    $('drand-result').textContent = 'Spør drand … (bare rundenumrene sendes)';
+    $('drand-result').textContent = '…';
     S.drand.confirm(current.report.replay.sessions).then(function (r) {
       btn.disabled = false;
-      if (r.offline === r.checked) { $('drand-result').textContent = 'Fikk ikke kontakt med drand. Prøv igjen senere.'; return; }
+      if (r.offline === r.checked) { $('drand-result').textContent = 'Fikk ikke kontakt med drand.'; return; }
       $('drand-result').textContent = r.failed.length
-        ? 'Avvik: ' + r.failed.length + ' av ' + r.checked + ' tidsstempler finnes ikke hos drand (runde ' + r.failed.join(', ') + '). Fila er endret eller laget på annen måte.'
-        : 'Bekreftet: alle ' + r.matched + ' tidsstemplene er ekte verdier fra drand. Øktene med tidsstempel kan ikke ha blitt laget før tidspunktene som står der.';
+        ? 'Avvik: ' + r.failed.length + ' av ' + r.checked + ' tidsstempler finnes ikke hos drand.'
+        : 'Bekreftet: ' + r.matched + ' av ' + r.checked + ' tidsstempler er ekte.';
     });
   });
 
   window.addEventListener('popstate', function (e) {
-    var st = e.state || { view: 'start' };
+    var st = e.state || { view: location.hash === '#skriv' ? 'write' : 'start' };
     if (st.view === 'detail' && byId(st.id)) openDetail(byId(st.id));
     else if (st.view === 'overview' && files.length) showOverview();
+    else if (st.view === 'write') showWrite();
     else setView('start');
   });
+
+  $('start-new').addEventListener('click', function () {
+    if (window.SkriftsporWriter.startNew()) showWrite('push');
+  });
+  $('continue-local').addEventListener('click', function () { showWrite('push'); });
+  $('home').addEventListener('click', function (e) {
+    e.preventDefault();
+    files = []; current = null;
+    history.pushState({ view: 'start' }, '', '/');
+    setView('start');
+  });
+
+  /* «Om siden» — a dialog, so the page stays one page. */
+  $('about-open').addEventListener('click', function () { $('about').showModal(); });
+  $('about-close').addEventListener('click', function () { $('about').close(); });
+  $('about').addEventListener('click', function (e) { if (e.target === this) this.close(); });
 
   /* The whole window takes a drop. A cover says so while dragging. */
   var depth = 0;
   function hasFiles(e) { return e.dataTransfer && [].indexOf.call(e.dataTransfer.types || [], 'Files') !== -1; }
-  window.addEventListener('dragenter', function (e) { if (!hasFiles(e)) return; depth++; $('dragcover').hidden = false; });
+  window.addEventListener('dragenter', function (e) { if (!hasFiles(e) || document.body.getAttribute('data-view') === 'write') return; depth++; $('dragcover').hidden = false; });
   window.addEventListener('dragleave', function () { if (--depth <= 0) { depth = 0; $('dragcover').hidden = true; } });
   window.addEventListener('dragover', function (e) { if (hasFiles(e)) e.preventDefault(); });
   window.addEventListener('drop', function (e) {
     if (!hasFiles(e)) return;
+    if (document.body.getAttribute('data-view') === 'write') { e.preventDefault(); depth = 0; $('dragcover').hidden = true; return; }
     e.preventDefault();
     depth = 0;
     $('dragcover').hidden = true;
     addFiles(e.dataTransfer.files);
   });
 
-  history.replaceState({ view: 'start' }, '');
-  if (location.hash === '#lokal') loadLocal();
+  window.SkriftsporInbox = { loadLocal: loadLocal };
+
+  /* Old addresses (/skriv/ etc.) redirect here with a hash. */
+  function boot() {
+    if (location.hash === '#skriv') { history.replaceState({ view: 'write' }, '', '#skriv'); showWrite(); }
+    else if (location.hash === '#lokal') { history.replaceState({ view: 'start' }, '', '/'); setView('start'); loadLocal(); }
+    else { history.replaceState({ view: 'start' }, ''); setView('start'); }
+  }
+  if (window.SkriftsporWriter && document.getElementById('write-input').readOnly === false) boot();
+  else document.addEventListener('skriftspor:writer-ready', boot, { once: true });
 })();

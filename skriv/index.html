@@ -2,79 +2,10 @@
 <html lang="nb">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Skriv — Skriftspor</title>
-  <meta name="description" content="En enkel skriveblokk som tar vare på skriveprosessen din. Alt blir i nettleseren din til du selv laster ned spor-fila.">
-
-  <link rel="stylesheet" href="/css/tokens.css">
-  <link rel="stylesheet" href="/css/base.css">
-  <link rel="stylesheet" href="/css/components.css">
-  <link rel="stylesheet" href="/css/app.css">
-
-  <script src="/js/header.js" defer></script>
-  <script src="/js/skriftspor.js" defer></script>
-  <script src="/js/write.js" defer></script>
+  <title>Skriftspor</title>
+  <!-- Skriftspor is one page since 2026-10-19. Old links land here. -->
+  <meta http-equiv="refresh" content="0; url=/#skriv">
+  <link rel="canonical" href="https://skriftspor.no/">
 </head>
-<body class="page-write">
-
-  <header class="siteheader" data-site-header></header>
-
-  <main>
-
-    <!-- The bar: title, status and the four things a writer does. -->
-    <section class="band band--alt writebar">
-      <div class="band__inner writebar__inner">
-        <div class="writebar__title">
-          <label for="write-title" class="visually-hidden">Tittel</label>
-          <input id="write-title" class="writebar__titleinput" type="text" placeholder="Tittel på teksten" autocomplete="off" maxlength="120">
-          <p id="write-status" class="writebar__status" role="status">Laster …</p>
-        </div>
-        <div class="btn-row writebar__actions">
-          <button type="button" id="btn-download" class="btn btn--primary">Last ned spor-fil</button>
-          <button type="button" id="btn-copy" class="btn btn--ghost">Kopier teksten</button>
-          <button type="button" id="btn-resume" class="btn btn--ghost">Fortsett fra fil</button>
-          <a class="btn btn--ghost" href="/#lokal">Spill av</a>
-          <button type="button" id="btn-new" class="btn btn--quiet">Ny tekst</button>
-          <input type="file" id="resume-file" accept=".spor,.json,application/json" hidden>
-        </div>
-      </div>
-    </section>
-
-    <!-- Shown until there is text. Four steps, nothing more. -->
-    <section class="band band--tint writeintro" id="write-intro">
-      <div class="band__inner">
-        <div class="writeintro__head">
-          <h1 class="writeintro__title">Slik viser du skriveprosessen din</h1>
-          <button type="button" id="intro-close" class="btn btn--quiet">Skjul</button>
-        </div>
-        <ol class="writeintro__steps">
-          <li><strong>Skriv teksten her.</strong> Alt du skriver, sletter og limer inn blir tatt vare på med tidspunkt.</li>
-          <li><strong>Last ned spor-fila</strong> når du er ferdig for dagen. Da kan du fortsette senere, også på en annen maskin.</li>
-          <li><strong>Kopier teksten</strong> over i Word eller Docs og gjør formatering, overskrifter og kildeliste der.</li>
-          <li><strong>Lever spor-fila</strong> sammen med oppgaven, hvis læreren ber om det. Det er du som bestemmer hvem som får den.</li>
-        </ol>
-        <p class="writeintro__note">Teksten lagres bare i denne nettleseren og sendes ikke noe sted. Bruker du en skole-PC som slettes, må du laste ned spor-fila før du logger av.</p>
-      </div>
-    </section>
-
-    <!-- The sheet. A textarea over a highlight layer; see js/write.js. -->
-    <section class="band writearea">
-      <div class="band__inner writearea__inner">
-        <div class="sheet">
-          <div class="sheet__mirror" id="write-mirror" aria-hidden="true"></div>
-          <label for="write-input" class="visually-hidden">Teksten din</label>
-          <textarea id="write-input" class="sheet__input" spellcheck="true" lang="nb" placeholder="Begynn å skrive her …"></textarea>
-        </div>
-        <div class="sheet__foot">
-          <p id="write-stats" class="sheet__stats"></p>
-          <p class="sheet__legend"><span class="legend-pasted">Blå bakgrunn med prikket strek</span> = innlimt tekst</p>
-        </div>
-      </div>
-    </section>
-
-  </main>
-
-  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
-
-</body>
+<body><p><a href="/#skriv">Skriftspor</a></p></body>
 </html>

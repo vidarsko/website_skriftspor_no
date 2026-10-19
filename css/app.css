@@ -612,3 +612,52 @@
 .detail__title { font-size: var(--step-xl); margin-bottom: var(--space-2); }
 .detail__top .player__text { height: min(65vh, 40rem); }
 .detail__top .player__timeline { height: 2.75rem; cursor: ew-resize; }
+
+/* --------------------------------------------------------------------------
+   One page (2026-10-19): the header has the wordmark and «Om siden» only.
+   -------------------------------------------------------------------------- */
+
+.btn--small { min-height: 44px; padding: 0.4rem 1rem; font-size: var(--step-xs); }
+
+/* Formatting toolbar above the sheet: four square buttons, flush, the
+   hairline showing through the 1px gaps (the language-switch trick). */
+.formatbar {
+  display: flex;
+  gap: 1px;
+  width: max-content;
+  max-width: 46rem;
+  margin: 0 auto var(--space-1);
+  background: var(--rule);
+  border: 1px solid var(--rule);
+}
+.writearea__inner > .formatbar { margin-left: max(0px, calc((100% - 46rem) / 2)); }
+.formatbar__btn {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: var(--step-m);
+  cursor: pointer;
+}
+.formatbar__btn:hover { background: var(--primary-tint); }
+.formatbar__btn[data-format="heading"] { font-family: var(--font-sans); font-weight: 700; }
+
+/* «Om siden» */
+.about {
+  width: min(42rem, calc(100% - 2 * var(--space-2)));
+  max-height: calc(100vh - 2 * var(--space-4));
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--shadow-float);
+}
+.about::backdrop { background: var(--scrim); }
+.about__inner { padding: var(--space-4); }
+.about__head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+.about__head h2 { margin: 0; font-size: var(--step-l); }
+.about .prose h3 { margin-top: var(--space-3); }

@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Skriftspor — vis skriveprosessen din</title>
-  <meta name="description" content="Slipp spor-filer her for å se hvordan tekstene ble skrevet, eller start en ny tekst. Ingen konto, ingen server — alt skjer i nettleseren din.">
-  <meta property="og:title" content="Skriftspor — vis skriveprosessen din">
-  <meta property="og:description" content="En enkel skriveblokk som tar vare på hvordan teksten din blir til, og et sted å spille den av igjen. Alt skjer i nettleseren din.">
+  <title>Skriftspor</title>
+  <meta name="description" content="Skriv en tekst som husker hvordan den ble til, og spill av andres spor-filer. Alt skjer i nettleseren din.">
+  <meta property="og:title" content="Skriftspor">
+  <meta property="og:description" content="Skriv en tekst som husker hvordan den ble til, og spill av andres spor-filer. Alt skjer i nettleseren din.">
   <meta property="og:url" content="https://skriftspor.no/">
   <meta property="og:type" content="website">
 
@@ -15,34 +15,40 @@
   <link rel="stylesheet" href="/css/components.css">
   <link rel="stylesheet" href="/css/app.css">
 
-  <script src="/js/header.js" defer></script>
   <script src="/js/skriftspor.js" defer></script>
   <script src="/js/replay.js" defer></script>
   <script src="/js/extract.js" defer></script>
+  <script src="/js/write.js" defer></script>
   <script src="/js/inbox.js" defer></script>
 </head>
-<body>
+<body data-view="start">
 
-  <header class="siteheader" data-site-header></header>
+  <!--
+    ONE PAGE (Vidar, 2026-10-19): no menu, no other pages. The bar holds
+    the wordmark and one button, «Om siden». Everything else is a view on
+    this page, switched by js/inbox.js: start, write, overview, detail.
+    Text is kept to a minimum on purpose; what was removed is listed in the
+    project note (work/Projects/Skriftspor.md), not here.
+  -->
+  <header class="siteheader">
+    <div class="siteheader__inner">
+      <a class="wordmark" href="/" id="home"><span class="wordmark__mark" aria-hidden="true">&#9679;</span>Skriftspor</a>
+      <button type="button" class="btn btn--ghost btn--small" id="about-open">Om siden</button>
+    </div>
+  </header>
 
   <main>
 
-    <!--
-      THE FIRST THING ON THE SITE (Vidar, 2026-10-18): a drop zone for
-      .spor files and a button to start a new text. Nothing above it.
-      The whole window accepts a drop, not only this band; the band is
-      where the page says so. The page's one loud band.
-    -->
+    <!-- ===== START: drop zone + start writing ===== -->
     <section class="dropband" id="dropband">
       <div class="dropband__inner">
         <div class="dropband__zone" id="dropzone">
           <p class="dropband__title">Slipp spor-filer her</p>
-          <p class="dropband__sub">En fil viser hvordan teksten ble skrevet. Flere filer gir en oversikt over alle innleveringene.</p>
           <div class="btn-row dropband__actions">
-            <button type="button" class="btn btn--primary" id="pick-files">Velg spor-filer</button>
-            <a class="btn btn--ghost" href="/skriv/">Start ny tekst</a>
+            <button type="button" class="btn btn--primary" id="pick-files">Velg filer</button>
+            <button type="button" class="btn btn--ghost" id="start-new">Start ny tekst</button>
+            <button type="button" class="btn btn--ghost" id="continue-local" hidden>Fortsett teksten din</button>
           </div>
-          <p class="dropband__note">Filene leses av nettleseren din og sendes ikke noe sted.</p>
         </div>
         <input type="file" id="file-input" accept=".spor,.json,application/json" multiple hidden>
       </div>
@@ -50,20 +56,57 @@
 
     <p class="inbox__error" id="inbox-error" role="alert" hidden></p>
 
-    <!-- ===== OVERVIEW: shown when more than one file is loaded ===== -->
+    <!-- ===== WRITE ===== -->
+    <div id="write" hidden>
+      <section class="band band--alt writebar">
+        <div class="band__inner writebar__inner">
+          <div class="writebar__title">
+            <label for="write-title" class="visually-hidden">Tittel</label>
+            <input id="write-title" class="writebar__titleinput" type="text" placeholder="Tittel" autocomplete="off" maxlength="120">
+            <p id="write-status" class="writebar__status" role="status"></p>
+          </div>
+          <div class="btn-row writebar__actions">
+            <button type="button" id="btn-download" class="btn btn--primary">Last ned spor-fil</button>
+            <button type="button" id="btn-copy" class="btn btn--ghost">Kopier</button>
+            <button type="button" id="btn-play" class="btn btn--ghost">Spill av</button>
+            <button type="button" id="btn-resume" class="btn btn--quiet">Åpne spor-fil</button>
+            <button type="button" id="btn-new" class="btn btn--quiet">Ny tekst</button>
+            <input type="file" id="resume-file" accept=".spor,.json,application/json" hidden>
+          </div>
+        </div>
+      </section>
+
+      <section class="band writearea">
+        <div class="band__inner writearea__inner">
+          <div class="formatbar" role="toolbar" aria-label="Formatering">
+            <button type="button" class="formatbar__btn" data-format="heading" title="Overskrift (# )" aria-label="Overskrift">H</button>
+            <button type="button" class="formatbar__btn" data-format="bold" title="Fet (Ctrl+B)" aria-label="Fet"><b>B</b></button>
+            <button type="button" class="formatbar__btn" data-format="italic" title="Kursiv (Ctrl+I)" aria-label="Kursiv"><i>I</i></button>
+            <button type="button" class="formatbar__btn" data-format="underline" title="Understreket (Ctrl+U)" aria-label="Understreket"><u>U</u></button>
+          </div>
+          <div class="sheet">
+            <div class="sheet__mirror" id="write-mirror" aria-hidden="true"></div>
+            <label for="write-input" class="visually-hidden">Teksten din</label>
+            <textarea id="write-input" class="sheet__input" spellcheck="true" lang="nb"></textarea>
+          </div>
+          <div class="sheet__foot">
+            <p id="write-stats" class="sheet__stats"></p>
+            <p class="sheet__legend"><span class="legend-pasted">innlimt</span></p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ===== OVERVIEW: several files ===== -->
     <section class="band" id="overview" hidden>
       <div class="band__inner">
         <div class="overview__head">
-          <div>
-            <p class="eyebrow">Oversikt</p>
-            <h1 class="overview__title" id="overview-title">Innleveringer</h1>
-          </div>
+          <h1 class="overview__title" id="overview-title">Innleveringer</h1>
           <div class="btn-row">
-            <button type="button" class="btn btn--ghost" id="add-files">Legg til flere</button>
+            <button type="button" class="btn btn--ghost" id="add-files">Legg til</button>
             <button type="button" class="btn btn--quiet" id="clear-files">Tøm</button>
           </div>
         </div>
-        <p class="overview__hint">Trykk på en innlevering for å spille den av. Trykk på en kolonneoverskrift for å sortere.</p>
         <div class="tablewrap">
           <table class="overview" id="overview-table">
             <thead></thead>
@@ -75,21 +118,18 @@
 
     <!-- ===== DETAIL: one submission ===== -->
     <div id="detail" hidden>
-
       <section class="band detail__top">
         <div class="band__inner">
-          <button type="button" class="btn btn--quiet detail__back" id="back" hidden>&larr; Tilbake til oversikten</button>
+          <button type="button" class="btn btn--quiet detail__back" id="back" hidden>&larr; Oversikt</button>
           <p class="eyebrow" id="detail-file"></p>
           <h1 class="detail__title" id="detail-title"></h1>
-          <p class="prose" id="detail-description"></p>
           <div id="player"></div>
-          <p class="sheet__legend player__legend"><span class="legend-pasted">Blå bakgrunn med prikket strek</span> = innlimt tekst · <span class="legend-fresh">oransje</span> = det som nettopp ble skrevet · <del>gjennomstreket</del> = det som nettopp ble slettet · rull med musehjulet over tidslinja for å spole</p>
+          <p class="sheet__legend player__legend"><span class="legend-pasted">innlimt</span> <span class="legend-fresh">nettopp skrevet</span> <del>nettopp slettet</del></p>
         </div>
       </section>
 
       <section class="band band--alt">
         <div class="band__inner">
-          <p class="eyebrow">Nøkkeltall</p>
           <dl class="facts" id="detail-facts"></dl>
           <div class="share" id="detail-share"></div>
         </div>
@@ -97,91 +137,73 @@
 
       <section class="band">
         <div class="band__inner">
-          <p class="eyebrow">Sammenligning med innlevert tekst</p>
           <div id="compare-empty">
-            <h2>Hvor mye av innleveringen er dokumentert?</h2>
-            <p class="prose">Slipp den innleverte teksten her (Word, PDF, OpenDocument eller ren tekst), eller lim den inn.</p>
             <div class="btn-row">
-              <button type="button" class="btn btn--ghost" id="pick-doc">Velg dokument</button>
+              <button type="button" class="btn btn--ghost" id="pick-doc">Sammenlign med innlevert tekst</button>
             </div>
             <details class="drop__paste">
-              <summary>Lim inn teksten i stedet</summary>
+              <summary>Lim inn teksten</summary>
               <label for="paste-doc" class="visually-hidden">Innlevert tekst</label>
-              <textarea id="paste-doc" rows="6" placeholder="Lim inn den innleverte teksten her"></textarea>
+              <textarea id="paste-doc" rows="6"></textarea>
               <button type="button" class="btn btn--ghost" id="paste-compare">Sammenlign</button>
             </details>
             <input type="file" id="file-doc" accept=".docx,.odt,.pdf,.txt,.md,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
           </div>
           <div id="compare-result" hidden>
             <h2 id="cmp-head"></h2>
-            <p class="prose" id="cmp-lede"></p>
             <div class="share" id="cmp-share"></div>
             <p class="cmp__legend">
-              <span class="legend-typed">Skrevet i Skriftspor</span>
-              <span class="legend-pasted">Limt inn i Skriftspor</span>
-              <span class="legend-missing">Ikke i spor-fila</span>
+              <span class="legend-typed">skrevet</span>
+              <span class="legend-pasted">innlimt</span>
+              <span class="legend-missing">ikke i spor-fila</span>
             </p>
             <div class="cmp__text" id="cmp-text"></div>
-            <p class="note-small" id="cmp-note"></p>
           </div>
         </div>
       </section>
 
       <section class="band band--alt">
         <div class="band__inner">
-          <p class="eyebrow">Kontroller</p>
-          <h2>Er fila hel og uendret?</h2>
           <ul class="checks" id="detail-checks"></ul>
           <div class="btn-row">
-            <button type="button" class="btn btn--ghost" id="drand-confirm" hidden>Bekreft tidsstemplene hos drand</button>
+            <button type="button" class="btn btn--quiet" id="drand-confirm" hidden>Bekreft tidsstempler hos drand</button>
           </div>
           <p class="note-small" id="drand-result"></p>
-        </div>
-      </section>
-
-    </div>
-
-    <!-- ===== Below the fold: what this is, for a first-time visitor ===== -->
-    <div id="about">
-      <section class="band">
-        <div class="band__inner">
-          <p class="eyebrow">Hva dette er</p>
-          <h2>Et skrivested som husker, ikke en KI-detektor</h2>
-          <div class="prose">
-            <p>Når du skriver i Skriftspor, blir hver innsetting, sletting og innliming tatt vare på med tidspunkt. Det blir til en <em>spor-fil</em> som viser hvordan teksten vokste fram: utkastene, omskrivingene, pausene. Den kan spilles av som en film.</p>
-            <p>Verktøyet er laget for den ærlige eleven. Det skal være lett å vise at du har gjort arbeidet selv. Det overvåker ingen, og det gjetter ikke på om en tekst er skrevet av KI.</p>
-          </div>
-          <ul class="principles">
-            <li><strong>Ingen konto, ingen server.</strong> Teksten din sendes ikke noe sted, og lagres bare i din egen nettleser mens du skriver.</li>
-            <li><strong>Du eier fila.</strong> Spor-fila ligger hos deg. Det er du som velger hvem som får se den.</li>
-            <li><strong>Ingenting skjult.</strong> Spor-fila er en egen, åpen fil, ikke noe som gjemmes i et Word-dokument. <a href="/format/">Formatet er beskrevet</a>, så hvem som helst kan lage sitt eget verktøy for å lese den.</li>
-            <li><strong>Liten og robust.</strong> Bare endringene lagres. Hver økt lagres for seg med sjekksummer, så en skade blir liggende der den er.</li>
-          </ul>
-        </div>
-      </section>
-
-      <section class="band band--tint">
-        <div class="band__inner band__inner--prose">
-          <p class="eyebrow">Ærlig talt</p>
-          <h2>Hva en spor-fil viser, og hva den ikke viser</h2>
-          <div class="prose">
-            <p>En spor-fil viser hvordan og når en tekst ble bygget opp. Den viser ikke at ingen KI ble brukt: noen kan skrive av en tekst fra en annen skjerm, eller la et program taste for seg. Bruk avspillingen som utgangspunkt for en samtale, ikke som en dom.</p>
-            <p><a href="/om/">Les mer om hva verktøyet kan og ikke kan</a></p>
-          </div>
         </div>
       </section>
     </div>
 
   </main>
 
-  <footer class="band band--dark sitefooter">
-    <div class="band__inner sitefooter__inner">
-      <p>Skriftspor — vis skriveprosessen din. Laget av Vidar Skogvoll.</p>
-      <p><a href="/personvern/">Personvern</a> · <a href="/format/">Filformatet</a></p>
-    </div>
-  </footer>
+  <!-- ===== OM SIDEN: the one place with explanatory text ===== -->
+  <dialog class="about" id="about">
+    <div class="about__inner">
+      <div class="about__head">
+        <h2>Om siden</h2>
+        <button type="button" class="btn btn--quiet" id="about-close">Lukk</button>
+      </div>
+      <div class="prose">
+        <h3>Slik virker det</h3>
+        <p>Skriftspor tar vare på hvordan en tekst blir til. Mens du skriver, lagres hver innsetting, sletting og innliming med tidspunkt. Innlimt tekst merkes som innlimt.</p>
+        <p>Last ned spor-fila når du er ferdig, og lever den sammen med teksten hvis læreren ber om det. Læreren slipper fila her og kan spille av skrivingen og sammenligne med den innleverte teksten.</p>
+        <p>En spor-fil viser hvordan og når teksten ble skrevet. Den beviser ikke at ingen KI ble brukt.</p>
 
-  <div class="dragcover" id="dragcover" aria-hidden="true" hidden><p>Slipp filene for å åpne dem</p></div>
+        <h3>Data og personvern</h3>
+        <ul>
+          <li>Ingenting sendes til noen server. Teksten lagres bare i nettleseren din til du sletter den med «Ny tekst».</li>
+          <li>Spor-fila er din. Du bestemmer hvem som får den.</li>
+          <li>Fila inneholder alt som ble skrevet, også tekst du har slettet, og når hvert tegn ble skrevet.</li>
+          <li>Ingen tastetrykk, ingen informasjonskapsler, ingen statistikk.</li>
+          <li>Siden henter av og til et offentlig tidsstempel fra drand.love, som ser IP-adressen din. Ingen tekst sendes.</li>
+          <li>Bruker du en delt maskin, trykk «Ny tekst» når du er ferdig.</li>
+        </ul>
+        <p class="note-small">Skriftspor er laget av Vidar Skogvoll.</p>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <div class="dragcover" id="dragcover" aria-hidden="true" hidden><p>Slipp filene</p></div>
 
 </body>
 </html>
