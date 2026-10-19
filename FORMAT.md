@@ -10,7 +10,7 @@ Fila er UTF-8-kodet JSON, og navnet slutter på `.spor`. Øverst står et kort s
 {
   "format": "skriftspor",
   "version": 1,
-  "spec": "https://github.com/vidarsko/website_skriftspor_no/blob/main/FORMAT.md",
+  "spec": "https://skriftspor.no/om/#filformat",
   "readme": "Dette er en spor-fil fra skriftspor.no …",
   "title": "Min tekst",
   "summary": { "…": "…" },

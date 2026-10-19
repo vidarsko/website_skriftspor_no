@@ -24,16 +24,20 @@
 <body data-view="start">
 
   <!--
-    ONE PAGE (Vidar, 2026-10-19): no menu, no other pages. The bar holds
-    the wordmark and one button, «Om siden». Everything else is a view on
-    this page, switched by js/inbox.js: start, write, overview, detail.
+    THE TOOL IS THIS ONE PAGE. The bar holds the wordmark and a two-item
+    menu (Vidar, 2026-10-19): /slik-bruker-du/ and /om/. Everything the
+    tool does is a view on this page, switched by js/inbox.js: start,
+    write, overview, detail.
     Text is kept to a minimum on purpose; what was removed is listed in the
     project note (work/Projects/Skriftspor.md), not here.
   -->
   <header class="siteheader">
     <div class="siteheader__inner">
       <a class="wordmark" href="/" id="home"><span class="wordmark__mark" aria-hidden="true">&#9679;</span>Skriftspor</a>
-      <button type="button" class="btn btn--ghost btn--small" id="about-open">Om siden</button>
+      <nav class="sitenav" aria-label="Hovedmeny">
+        <a href="/slik-bruker-du/">Slik bruker du</a>
+        <a href="/om/">Om siden</a>
+      </nav>
     </div>
   </header>
 
@@ -172,34 +176,6 @@
     </div>
 
   </main>
-
-  <!-- ===== OM SIDEN: the one place with explanatory text ===== -->
-  <dialog class="about" id="about">
-    <div class="about__inner">
-      <div class="about__head">
-        <h2>Om siden</h2>
-        <button type="button" class="btn btn--quiet" id="about-close">Lukk</button>
-      </div>
-      <div class="prose">
-        <h3>Slik virker det</h3>
-        <p>Skriftspor tar vare på hvordan en tekst blir til. Mens du skriver, lagres hver innsetting, sletting og innliming med tidspunkt. Innlimt tekst merkes som innlimt.</p>
-        <p>Last ned spor-fila når du er ferdig, og lever den sammen med teksten hvis læreren ber om det. Læreren slipper fila her og kan spille av skrivingen og sammenligne med den innleverte teksten.</p>
-        <p>En spor-fil viser hvordan og når teksten ble skrevet. Den beviser ikke at ingen KI ble brukt.</p>
-
-        <h3>Data og personvern</h3>
-        <ul>
-          <li>Ingenting sendes til noen server. Teksten lagres bare i nettleseren din til du sletter den med «Ny tekst».</li>
-          <li>Spor-fila er din. Du bestemmer hvem som får den.</li>
-          <li>Fila inneholder alt som ble skrevet, også tekst du har slettet, og når hvert tegn ble skrevet.</li>
-          <li>Ingen tastetrykk, ingen informasjonskapsler, ingen statistikk.</li>
-          <li>Siden henter av og til et offentlig tidsstempel fra drand.love, som ser IP-adressen din. Ingen tekst sendes.</li>
-          <li>Bruker du en delt maskin, trykk «Ny tekst» når du er ferdig.</li>
-        </ul>
-        <p><a href="https://github.com/vidarsko/website_skriftspor_no/blob/main/FORMAT.md" target="_blank" rel="noopener">Filformatet</a> er åpent og beskrevet, så hvem som helst kan lage sitt eget verktøy for å lese spor-filer.</p>
-        <p class="note-small">Skriftspor er laget av Vidar Skogvoll.</p>
-      </div>
-    </div>
-  </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
   <div class="dragcover" id="dragcover" aria-hidden="true" hidden><p>Slipp filene</p></div>

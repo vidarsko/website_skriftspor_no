@@ -19,7 +19,7 @@
 
   var FORMAT = 'skriftspor';
   var VERSION = 1;
-  var SPEC_URL = 'https://github.com/vidarsko/website_skriftspor_no/blob/main/FORMAT.md';
+  var SPEC_URL = 'https://skriftspor.no/om/#filformat';
   var ZERO_HASH = '0000000000000000000000000000000000000000000000000000000000000000';
 
   /* A gap longer than this between two edits starts a new session (økt).

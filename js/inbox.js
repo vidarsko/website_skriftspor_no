@@ -371,10 +371,7 @@
     setView('start');
   });
 
-  /* «Om siden» — a dialog, so the page stays one page. */
-  $('about-open').addEventListener('click', function () { $('about').showModal(); });
-  $('about-close').addEventListener('click', function () { $('about').close(); });
-  $('about').addEventListener('click', function (e) { if (e.target === this) this.close(); });
+
 
   /* The whole window takes a drop. A cover says so while dragging. */
   var depth = 0;

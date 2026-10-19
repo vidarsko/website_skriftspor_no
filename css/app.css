@@ -629,19 +629,15 @@
 .formatbar__btn[aria-pressed="true"] { background: var(--ink); color: var(--ink-inverse); }
 .formatbar__btn[data-format="heading"] { font-family: var(--font-sans); font-weight: 700; }
 
-/* «Om siden» */
-.about {
-  width: min(42rem, calc(100% - 2 * var(--space-2)));
-  max-height: calc(100vh - 2 * var(--space-4));
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: var(--paper);
-  color: var(--ink);
-  box-shadow: var(--shadow-float);
+/* Two menu items fit on a phone, so no drawer: they stay on one line. */
+@media (max-width: 767px) {
+  .siteheader .sitenav { flex-direction: row; gap: var(--space-2); }
+  .siteheader .sitenav a {
+    padding: var(--space-1) 0;
+    border-left: 0;
+    border-bottom: 2px solid transparent;
+    font-size: var(--step-xs);
+  }
+  .siteheader .sitenav a.is-current { padding-left: 0; border-bottom-color: var(--ink); }
+  .siteheader .sitenav a:hover { padding-left: 0; border-bottom-color: var(--primary); }
 }
-.about::backdrop { background: var(--scrim); }
-.about__inner { padding: var(--space-4); }
-.about__head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
-.about__head h2 { margin: 0; font-size: var(--step-l); }
-.about .prose h3 { margin-top: var(--space-3); }

@@ -2,10 +2,231 @@
 <html lang="nb">
 <head>
   <meta charset="utf-8">
-  <title>Skriftspor</title>
-  <!-- Skriftspor is one page since 2026-10-19. Old links land here. -->
-  <meta http-equiv="refresh" content="0; url=/">
-  <link rel="canonical" href="https://skriftspor.no/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Om siden — Skriftspor</title>
+  <meta name="description" content="Hvordan Skriftspor virker, hvordan data behandles, og spor-filformatet.">
+
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/app.css">
 </head>
-<body><p><a href="/">Skriftspor</a></p></body>
+<body>
+
+  <!-- Same bar as index.html. Change all three together. -->
+  <header class="siteheader">
+    <div class="siteheader__inner">
+      <a class="wordmark" href="/"><span class="wordmark__mark" aria-hidden="true">&#9679;</span>Skriftspor</a>
+      <nav class="sitenav" aria-label="Hovedmeny"><a href="/slik-bruker-du/">Slik bruker du</a><a href="/om/" class="is-current" aria-current="page">Om siden</a></nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="band">
+      <div class="band__inner band__inner--prose">
+        <h1>Om siden</h1>
+        <div class="prose">
+          <p>Skriftspor tar vare på hvordan en tekst blir til. Mens du skriver, lagres hver innsetting, sletting, innliming og formatering med tidspunkt. Du laster ned dette som en spor-fil og velger selv hvem som får den. Den som får fila, kan spille av skrivingen og sammenligne den med teksten som ble levert.</p>
+          <p>En spor-fil viser hvordan og når en tekst ble skrevet. Den beviser ikke at ingen KI ble brukt: noen kan skrive av en tekst fra en annen skjerm eller la et program taste for seg, og en teknisk flink person kan lage en falsk fil, siden det ikke finnes noen hemmelig nøkkel. Bruk avspillingen som grunnlag for en samtale, ikke som en dom.</p>
+          <p>Skriftspor er laget av Vidar Skogvoll.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="band band--alt" id="personvern">
+      <div class="band__inner band__inner--prose">
+        <h2>Personvern</h2>
+        <div class="prose">
+          <p>Skriftspor er en samling statiske filer. Det finnes ingen server som tar imot tekst, ingen konto og ingen database. Ingenting av det du skriver eller laster inn, sendes noe sted.</p>
+
+          <h3>Hva som lagres</h3>
+          <ul>
+            <li>Hver endring i skrivefeltet med tidspunkt: tekst som skrives inn, tekst som slettes (og hva den var), tekst som limes inn, formatering, og hvor markøren står.</li>
+            <li>Ikke tastetrykk, ikke hva du gjør i andre vinduer eller faner, ikke musebevegelser.</li>
+            <li>Spor-fila inneholder derfor også tekst du har slettet, og når hvert tegn ble skrevet. Skriverytmen kan i prinsippet si noe om hvem som skriver.</li>
+          </ul>
+
+          <h3>Hvor det lagres</h3>
+          <ul>
+            <li>Mens du skriver, ligger teksten og loggen i nettleserens lokale lagring (<code>localStorage</code>) på din egen maskin, til du trykker «Ny tekst» eller tømmer nettleserdataene for skriftspor.no.</li>
+            <li>På en delt maskin kan neste bruker i samme nettleser åpne teksten. Trykk «Ny tekst» når du er ferdig.</li>
+            <li>Spor-fila lages på maskinen din når du laster den ned. Det er du som bestemmer hvem som får den.</li>
+            <li>Når noen slipper spor-filer eller et innlevert dokument på siden, leses de av deres egen nettleser og lastes ikke opp noe sted.</li>
+          </ul>
+
+          <h3>Forespørsler ut av maskinen</h3>
+          <ul>
+            <li>Mens du skriver, henter siden omtrent hvert femte minutt et offentlig tilfeldig tall fra <a href="https://drand.love">drand</a> (<code>api.drand.sh</code>, eventuelt <code>api2.drand.sh</code> eller <code>drand.cloudflare.com</code>). Forespørselen inneholder ingen tekst og ingenting om deg, men tjenesten ser IP-adressen din. Uten nett hoppes dette over.</li>
+            <li>«Bekreft tidsstempler hos drand» sender rundenumrene fra fila, og ingenting annet.</li>
+            <li>Siden bruker ingen informasjonskapsler, ingen statistikk og ingen sporing. Skrifttypene ligger på siden selv.</li>
+            <li>Sidene ligger på GitHub Pages. GitHub kan føre tekniske logger over besøk, som IP-adresser, slik alle webverter gjør.</li>
+          </ul>
+
+          <h3>Ansvar</h3>
+          <p>Skriftspor mottar ingen personopplysninger. Når en elev leverer en spor-fil til en lærer, behandler skolen den på samme måte som selve innleveringen, etter skolens egne rutiner.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" id="filformat">
+      <div class="band__inner band__inner--prose">
+        <h2>Filformatet, versjon 1</h2>
+        <div class="prose">
+<!-- Generert fra FORMAT.md 2026-10-19. Endres FORMAT.md, endres denne også. -->
+<p>Spor-fila fra <a href="https://skriftspor.no">skriftspor.no</a> er åpen og dokumentert, slik at hvem som helst kan lese den og lage sin egen verifikator. Referanseimplementasjonen er <a href="/js/skriftspor.js"><code>js/skriftspor.js</code></a>, lesbar JavaScript uten avhengigheter. Der koden og denne beskrivelsen er uenige, er det en feil.</p>
+<h3>Oversikt</h3>
+<p>Fila er UTF-8-kodet JSON, og navnet slutter på <code>.spor</code>. Øverst står et kort sammendrag og hele slutteksten i klartekst, så teksten overlever selv om loggen skades. Selve loggen er delt i økter. Hver økt er komprimert for seg og har egne sjekksummer, så skade i én økt ikke ødelegger de andre.</p>
+<pre><code class="language-json">{
+  &quot;format&quot;: &quot;skriftspor&quot;,
+  &quot;version&quot;: 1,
+  &quot;spec&quot;: &quot;https://skriftspor.no/om/#filformat&quot;,
+  &quot;readme&quot;: &quot;Dette er en spor-fil fra skriftspor.no …&quot;,
+  &quot;title&quot;: &quot;Min tekst&quot;,
+  &quot;summary&quot;: { &quot;…&quot;: &quot;…&quot; },
+  &quot;text&quot;: &quot;Hele slutteksten …&quot;,
+  &quot;text_sha256&quot;: &quot;…&quot;,
+  &quot;head&quot;: &quot;&lt;hash for siste økt&gt;&quot;,
+  &quot;sessions&quot;: [ { &quot;…&quot;: &quot;…&quot; } ]
+}
+</code></pre>
+<h3>Sammendraget (<code>summary</code>)</h3>
+<p>Ment for mennesker som åpner fila i et tekstprogram. Det regnes ut fra loggen når fila lages, men en leser skal ikke stole på det: regn det ut på nytt fra loggen.</p>
+<p>Feltene er <code>first_event</code>, <code>last_event</code>, <code>sessions</code>, <code>active_minutes</code> (pauser over to minutter teller som to minutter), <code>events</code>, <code>final_chars</code>, <code>final_words</code>, <code>final_typed_chars</code>, <code>final_pasted_chars</code>, <code>final_unknown_chars</code>, <code>final_typed_percent</code>, <code>final_pasted_percent</code>, <code>typed_chars_total</code>, <code>pasted_chars_total</code>, <code>deleted_chars_total</code>, <code>pastes</code>, <code>drand_checkpoints</code> og <code>description</code>, som er én setning på norsk.</p>
+<h3>En økt (<code>sessions[i]</code>)</h3>
+<pre><code class="language-json">{
+  &quot;n&quot;: 1,
+  &quot;start&quot;: &quot;2026-10-18T10:00:00.000Z&quot;,
+  &quot;end&quot;: &quot;2026-10-18T10:42:13.512Z&quot;,
+  &quot;events&quot;: 1834,
+  &quot;prev&quot;: &quot;000…000&quot;,
+  &quot;log_sha256&quot;: &quot;…&quot;,
+  &quot;text_end_sha256&quot;: &quot;…&quot;,
+  &quot;hash&quot;: &quot;…&quot;,
+  &quot;data_sha256&quot;: &quot;…&quot;,
+  &quot;data&quot;: &quot;H4sIAAAAAAAA…&quot;
+}
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>Felt</th>
+<th>Betydning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>n</code></td>
+<td>Øktnummer, fra 1.</td>
+</tr>
+<tr>
+<td><code>start</code>, <code>end</code></td>
+<td>Tidspunkt for første og siste hendelse (ISO 8601, UTC).</td>
+</tr>
+<tr>
+<td><code>events</code></td>
+<td>Antall hendelser i loggen.</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td>Loggen: en JSON-liste med hendelser, gzip-komprimert og base64-kodet.</td>
+</tr>
+<tr>
+<td><code>data_sha256</code></td>
+<td>SHA-256 av de komprimerte bytene. Fanger opp skade før utpakking.</td>
+</tr>
+<tr>
+<td><code>log_sha256</code></td>
+<td>SHA-256 av den utpakkede JSON-teksten.</td>
+</tr>
+<tr>
+<td><code>text_end_sha256</code></td>
+<td>SHA-256 av hele teksten slik den var etter økta.</td>
+</tr>
+<tr>
+<td><code>prev</code></td>
+<td>Forrige økts <code>hash</code>. For den første økta: 64 nuller.</td>
+</tr>
+<tr>
+<td><code>hash</code></td>
+<td>Øktas lenke i hash-kjeden.</td>
+</tr>
+</tbody>
+</table>
+<p>En ny økt begynner etter mer enn 30 minutters pause, eller når fila lastes opp igjen for å skrive videre.</p>
+<h4>Hash-kjeden</h4>
+<p><code>hash</code> er SHA-256 (heksadesimalt, små bokstaver) av disse åtte verdiene, skilt med linjeskift (<code>\n</code>):</p>
+<pre><code>skriftspor/1
+&lt;n&gt;
+&lt;start&gt;
+&lt;end&gt;
+&lt;events&gt;
+&lt;prev&gt;
+&lt;log_sha256&gt;
+&lt;text_end_sha256&gt;
+</code></pre>
+<p>De komprimerte bytene er ikke med, fordi to riktige gzip-programmer kan gi ulike bytes for samme logg. Feltet <code>head</code> øverst i fila er den siste øktas <code>hash</code>.</p>
+<p>Kjeden gjør det synlig hvis en tidligere økt endres uten at alt etter den regnes ut på nytt. Den kan ikke hindre at noen lager en helt ny, falsk fil, fordi det ikke finnes noen hemmelig nøkkel. Det er et bevisst valg: alt skjer hos brukeren.</p>
+<h3>Hendelsene</h3>
+<p>En hendelse er en kort liste. Første element er alltid antall millisekunder siden forrige hendelse i samme økt (0 for den første). Tidspunktet for en hendelse er <code>start</code> pluss summen av alle tidsforskjellene fram til og med den.</p>
+<table>
+<thead>
+<tr>
+<th>Hendelse</th>
+<th>Betydning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[dt, "i", pos, "tekst", fmt]</code></td>
+<td>Tekst skrevet inn ved posisjon <code>pos</code>. <code>fmt</code> er valgfri, se under.</td>
+</tr>
+<tr>
+<td><code>[dt, "p", pos, "tekst", fmt]</code></td>
+<td>Tekst limt inn eller dratt inn ved <code>pos</code>. Også tekst som kom inn i feltet uten å være tastet, for eksempel fra et nettlesertillegg.</td>
+</tr>
+<tr>
+<td><code>[dt, "d", pos, "tekst"]</code></td>
+<td>«tekst» ble slettet, fra posisjon <code>pos</code>. Den slettede teksten lagres, så loggen kan spilles både fram og tilbake.</td>
+</tr>
+<tr>
+<td><code>[dt, "c", start, slutt]</code></td>
+<td>Markøren ble flyttet eller tekst merket. Like tall betyr en markør uten merking.</td>
+</tr>
+<tr>
+<td><code>[dt, "f", a, b, bits, på]</code></td>
+<td>Formatering slått på (<code>på</code> = 1) eller av (0) for tegnene fra <code>a</code> til (ikke med) <code>b</code>. Teksten endres ikke.</td>
+</tr>
+<tr>
+<td><code>[dt, "r", runde, tilfeldighet, signatur]</code></td>
+<td>Et sjekkpunkt fra drand, se under.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Posisjoner teller UTF-16-kodeenheter</strong>, slik JavaScript-strenger og nettleserens tekstfelt gjør. En leser i et annet språk må gjøre det samme, ellers vil for eksempel en emoji forskyve alle posisjoner etter den med én.</p>
+<p>Å bytte ut merket tekst gir to hendelser med samme tidspunkt: en sletting, så en innsetting.</p>
+<h4>Formatering</h4>
+<p>Formatering er ikke en del av teksten. Den er et sett biter per tegn: <code>1</code> fet, <code>2</code> kursiv, <code>4</code> understreket og <code>8</code> overskrift. Overskrift settes på alle tegnene i en linje, og en linje er en overskrift hvis det første tegnet har biten. Nye tegn får bitene i <code>fmt</code> på innsettingen (mangler den, er den 0). <code>"f"</code>-hendelser endrer bitene for et område.</p>
+<p>En leser som bare trenger teksten, kan overse <code>fmt</code> og <code>"f"</code>-hendelser helt. <code>text</code> er alltid ren tekst uten formateringstegn.</p>
+<h4>Å spille av</h4>
+<p>Start med tom tekst og bruk hendelsene i rekkefølge, økt for økt. Etter hver økt skal SHA-256 av teksten være lik <code>text_end_sha256</code>, og etter siste økt skal teksten være lik <code>text</code>. En sletting av tekst som ikke står der, betyr at loggen er skadd eller endret.</p>
+<p><strong>Skade holdes lokal.</strong> Kan en økt ikke leses, kan de neste likevel gjenskapes: start med <code>text</code> og spill de senere øktene baklengs (en innsetting fjernes, en sletting settes inn igjen). Da får du teksten slik den var i starten av hver økt etter den skadde.</p>
+<h3>Sjekkpunkter fra drand</h3>
+<p><a href="https://drand.love">drand</a> publiserer et nytt, uforutsigbart tall hvert tredje sekund. Skriftspor bruker kjeden <em>quicknet</em>:</p>
+<pre><code>kjede:  52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971
+start:  1692803367 (Unix-tid), periode 3 sekunder
+runde r publiseres ved  1692803367 + (r − 1) · 3
+</code></pre>
+<p>Mens det skrives, henter siden siste runde ved starten av hver økt og deretter omtrent hvert femte minutt med skriving, og legger den inn som en <code>"r"</code>-hendelse. Fordi verdien er med i loggen, og loggen er med i hash-kjeden, kan økta ikke ha blitt laget før runden ble publisert.</p>
+<p>En leser bør sjekke at hendelsens tidspunkt ikke er før rundens publiseringstid, og ikke mye senere (den ble hentet som «siste»). For å bekrefte at verdien er ekte, kan man hente <code>https://api.drand.sh/&lt;kjede&gt;/public/&lt;runde&gt;</code> og sammenligne <code>randomness</code>, eller verifisere BLS-signaturen.</p>
+<p>Sjekkpunktene beviser «ikke før», og ingenting mer. De sier ingenting om hvem som skrev, eller hvordan.</p>
+<h3>Sammenligning med innlevert tekst</h3>
+<p>Ikke en del av formatet, men slik gjør skriftspor.no det: begge tekstene deles i ord (bokstaver og tall, Unicode NFKC, små bokstaver), og et ord i den innleverte teksten regnes som dokumentert hvis det inngår i en sekvens på fire ord som også finnes i slutteksten. Tegnsetting, formatering og rekkefølgen på avsnittene teller ikke.</p>
+<h3>Versjoner</h3>
+<p>Feltet <code>version</code> økes hvis formatet endres slik at en eldre leser ville misforstå fila. Nye felt som eldre lesere trygt kan overse, gir ikke ny versjon.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+</body>
 </html>
