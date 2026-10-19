@@ -8,7 +8,9 @@
      paragraphs: [{ level: 0 (body) | 1 | 2 | 3 (heading), runs: [{ text, b, i, u }] }]
 
    Headings use Word's built-in styles Heading1–3, so the document gets a
-   working navigation pane and table of contents in Word.
+   working navigation pane and table of contents in Word, and the styles
+   match Word's standard template (Aptos), so the file looks like any
+   other new Word document.
    ========================================================================== */
 (function () {
   'use strict';
@@ -81,17 +83,27 @@
       '</w:body></w:document>';
   }
 
-  function heading(id, name, size, before) {
-    return '<w:style w:type="paragraph" w:styleId="' + id + '"><w:name w:val="' + name + '"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:uiPriority w:val="9"/><w:qFormat/>' +
-      '<w:pPr><w:keepNext/><w:spacing w:before="' + before + '" w:after="120"/><w:outlineLvl w:val="' + (+id.slice(-1) - 1) + '"/></w:pPr>' +
-      '<w:rPr><w:b/><w:sz w:val="' + size + '"/></w:rPr></w:style>';
+  /* Word's own default template ("Normal", Office 2023 and later): Aptos
+     12 pt for text, Aptos Display for headings in dark blue (#0F4761),
+     not bold, at 20/16/14 pt; 1.16 line spacing, 8 pt after paragraphs.
+     Written out in full rather than through a theme, so a reader without
+     Aptos (LibreOffice, older Word) still gets the same sizes and falls back
+     gracefully on the font. */
+  function heading(n, size, before) {
+    return '<w:style w:type="paragraph" w:styleId="Heading' + n + '"><w:name w:val="heading ' + n + '"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:uiPriority w:val="9"/><w:qFormat/>' +
+      '<w:pPr><w:keepNext/><w:keepLines/><w:spacing w:before="' + before + '" w:after="80"/><w:outlineLvl w:val="' + (n - 1) + '"/></w:pPr>' +
+      '<w:rPr><w:rFonts w:ascii="Aptos Display" w:hAnsi="Aptos Display" w:eastAsia="Aptos Display" w:cs="Aptos Display"/>' +
+      '<w:color w:val="0F4761"/><w:sz w:val="' + size + '"/><w:szCs w:val="' + size + '"/></w:rPr></w:style>';
   }
 
   var STYLES = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles ' + W + '>' +
-    '<w:docDefaults><w:rPrDefault><w:rPr><w:sz w:val="24"/><w:lang w:val="nb-NO"/></w:rPr></w:rPrDefault>' +
-    '<w:pPrDefault><w:pPr><w:spacing w:after="160" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>' +
+    '<w:docDefaults><w:rPrDefault><w:rPr>' +
+    '<w:rFonts w:ascii="Aptos" w:hAnsi="Aptos" w:eastAsia="Aptos" w:cs="Aptos"/>' +
+    '<w:kern w:val="2"/><w:sz w:val="24"/><w:szCs w:val="24"/><w:lang w:val="nb-NO" w:eastAsia="en-US" w:bidi="ar-SA"/>' +
+    '</w:rPr></w:rPrDefault>' +
+    '<w:pPrDefault><w:pPr><w:spacing w:after="160" w:line="278" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>' +
     '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>' +
-    heading('Heading1', 'heading 1', 36, 360) + heading('Heading2', 'heading 2', 30, 280) + heading('Heading3', 'heading 3', 26, 240) +
+    heading(1, 40, 360) + heading(2, 32, 160) + heading(3, 28, 160) +
     '</w:styles>';
 
   function coreXml(title, author) {
