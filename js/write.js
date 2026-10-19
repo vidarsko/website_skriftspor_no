@@ -742,12 +742,20 @@
       (doc.changedAt > doc.downloadedAt ? '\n\nDu har ikke lastet ned spor-fila etter siste endring.' : ''));
   }
 
-  function resume(file) {
+  /* Continue writing in a spor-file: its sessions are kept exactly as
+     stored (hashes and all), and the next edit starts a new session. */
+  function resume(file, done) {
     var reader = new FileReader();
     reader.onload = function () {
       var parsed;
       try { parsed = JSON.parse(reader.result); } catch (e) { return alert('Fila kunne ikke leses. Er det en spor-fil fra Skriftspor (.spor)?'); }
-      S.verifyFile(parsed).then(function (rep) {
+      resumeParsed(parsed, done);
+    };
+    reader.readAsText(file);
+  }
+
+  function resumeParsed(parsed, done) {
+      S.verifyFile(JSON.parse(JSON.stringify(parsed))).then(function (rep) {
         if (!rep.replay || !rep.replay.complete || rep.replay.state.text !== parsed.text) {
           return alert('Denne spor-fila er skadd eller endret, så det går ikke å skrive videre i den.');
         }
@@ -765,9 +773,8 @@
         save();
         ed.focus();
         render([state.text.length, state.text.length]);
+        if (done) done();
       });
-    };
-    reader.readAsText(file);
   }
 
   var toastTimer = null;
@@ -848,6 +855,8 @@
     /* Confirms discarding the current text, asks for name and title,
        then calls done(). Cancelling the questions keeps everything as it was
        only if there was no text; a discarded text is gone either way. */
+    resumeFile: resume,
+    resumeParsed: resumeParsed,
     startNew: function (done) {
       if (!confirmDiscard()) return;
       if (state.text || doc.sessions.length) reset();

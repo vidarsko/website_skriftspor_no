@@ -727,3 +727,5 @@
 
 /* Title and name leave room for the buttons on one line on a laptop. */
 .writebar__title { max-width: 30rem; }
+
+.detail__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
