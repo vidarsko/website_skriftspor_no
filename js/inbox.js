@@ -367,12 +367,6 @@
     window.SkriftsporWriter.startNew(function () { showWrite('push'); });
   });
   $('continue-local').addEventListener('click', function () { showWrite('push'); });
-  $('start-resume').addEventListener('click', function () { $('resume-input').click(); });
-  $('resume-input').addEventListener('change', function () {
-    var f = this.files[0];
-    this.value = '';
-    if (f) window.SkriftsporWriter.resumeFile(f, function () { showWrite('push'); });
-  });
   $('detail-resume').addEventListener('click', function () {
     if (!current) return;
     if (current.key === 'lokal') { history.back(); return; }
