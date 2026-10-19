@@ -83,15 +83,22 @@ En hendelse er en kort liste. Første element er alltid antall millisekunder sid
 
 | Hendelse | Betydning |
 |---|---|
-| `[dt, "i", pos, "tekst"]` | Tekst skrevet inn ved posisjon `pos`. |
-| `[dt, "p", pos, "tekst"]` | Tekst limt inn eller dratt inn ved `pos`. Også tekst som kom inn i feltet uten å være tastet, for eksempel fra et nettlesertillegg. |
+| `[dt, "i", pos, "tekst", fmt]` | Tekst skrevet inn ved posisjon `pos`. `fmt` er valgfri, se under. |
+| `[dt, "p", pos, "tekst", fmt]` | Tekst limt inn eller dratt inn ved `pos`. Også tekst som kom inn i feltet uten å være tastet, for eksempel fra et nettlesertillegg. |
 | `[dt, "d", pos, "tekst"]` | «tekst» ble slettet, fra posisjon `pos`. Den slettede teksten lagres, så loggen kan spilles både fram og tilbake. |
 | `[dt, "c", start, slutt]` | Markøren ble flyttet eller tekst merket. Like tall betyr en markør uten merking. |
+| `[dt, "f", a, b, bits, på]` | Formatering slått på (`på` = 1) eller av (0) for tegnene fra `a` til (ikke med) `b`. Teksten endres ikke. |
 | `[dt, "r", runde, tilfeldighet, signatur]` | Et sjekkpunkt fra drand, se under. |
 
 **Posisjoner teller UTF-16-kodeenheter**, slik JavaScript-strenger og nettleserens tekstfelt gjør. En leser i et annet språk må gjøre det samme, ellers vil for eksempel en emoji forskyve alle posisjoner etter den med én.
 
-Å bytte ut merket tekst gir to hendelser med samme tidspunkt: en sletting, så en innsetting. Formatering (`# `, `**`, `*`, `<u>`, `</u>`) skrives inn som vanlig tekst og logges som `"i"`.
+Å bytte ut merket tekst gir to hendelser med samme tidspunkt: en sletting, så en innsetting.
+
+### Formatering
+
+Formatering er ikke en del av teksten. Den er et sett biter per tegn: `1` fet, `2` kursiv, `4` understreket og `8` overskrift. Overskrift settes på alle tegnene i en linje, og en linje er en overskrift hvis det første tegnet har biten. Nye tegn får bitene i `fmt` på innsettingen (mangler den, er den 0). `"f"`-hendelser endrer bitene for et område.
+
+En leser som bare trenger teksten, kan overse `fmt` og `"f"`-hendelser helt. `text` er alltid ren tekst uten formateringstegn.
 
 ### Å spille av
 

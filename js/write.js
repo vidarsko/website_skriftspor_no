@@ -1,18 +1,26 @@
 /* ==========================================================================
-   write.js — the writing surface on /skriv/.
+   write.js — the writing surface (the «write» view on the front page).
 
-   A plain <textarea> with a highlight layer behind it. Every change to the
-   text is turned into one or two events (a deletion and/or an insertion)
-   and appended to the open session; see js/skriftspor.js for the format.
+   A contenteditable sheet that SHOWS formatting (heading, bold, italic,
+   underline) but is never the source of truth. The model is plain text
+   plus formatting runs (js/skriftspor.js: State/Spans). Every change is an
+   event in the open session, and the sheet is redrawn from the model.
 
-   HOW A CHANGE IS RECORDED. The textarea is the source of nothing: on every
-   `input` the new value is diffed against the model's own text, never
-   against the textarea's previous value. So a change that arrives without
-   an input event — an extension writing into the field, say — is still
-   caught on the next one, and is logged as pasted, since it was not typed.
+   HOW A CHANGE IS RECORDED
+   - Typing, Enter, deleting: `beforeinput` is cancelled and the change is
+     applied to the model directly, from the event's own ranges.
+   - Paste and drop: the plain text is taken from the clipboard / drag and
+     logged as pasted ("p"). Formatting from outside is not kept.
+   - Formatting buttons and Ctrl+B/I/U: an "f" event over the selection.
+     With nothing selected, the next typed text gets the format instead.
+   - Undo/redo: our own stack. The browser's would be wiped by every redraw.
+   - Anything else that changes the sheet (IME composition, some spellcheck
+     replacements): the sheet's text is diffed against the model afterwards
+     and logged as typed. Text that arrives with no input event at all (an
+     extension writing into the sheet) is logged as pasted.
 
    WHAT IS NOT RECORDED: focus, window switches, mouse movement, anything
-   outside the textarea. The tool shows how the text was built, not what the
+   outside the sheet. The tool shows how the text was built, not what the
    writer did with the rest of their screen. Don't add it.
    ========================================================================== */
 (function () {
@@ -21,9 +29,12 @@
   var S = window.Skriftspor;
   var DRAND_EVERY_MS = 5 * 60 * 1000;
   var CURSOR_DEBOUNCE_MS = 400;
+  var UNDO_MERGE_MS = 1000;
 
-  var ta = document.getElementById('write-input');
-  var mirror = document.getElementById('write-mirror');
+  var BOLD = 1, ITALIC = 2, UNDERLINE = 4, HEADING = 8;
+  var BITS = { bold: BOLD, italic: ITALIC, underline: UNDERLINE, heading: HEADING };
+
+  var ed = document.getElementById('write-input');
   var titleInput = document.getElementById('write-title');
   var statusEl = document.getElementById('write-status');
   var statsEl = document.getElementById('write-stats');
@@ -33,21 +44,20 @@
   /* ---- The model --------------------------------------------------------
      doc   = what is in localStorage: { v, title, sessions, savedAt,
              downloadedAt, changedAt }
-     state = the replayed text and its origin spans */
+     state = the replayed text, origin and formatting runs */
   var doc = null;
   var state = new S.State('');
   var ready = false;
   var lastDrand = 0;
-  var pendingPaste = false;
-  var lastInputType = '';
   var locked = false;
+  var composing = false;
+  var pending = null;   /* formatting chosen with nothing selected: { at, f } */
 
   function current() { return doc.sessions[doc.sessions.length - 1]; }
   function openRaw() {
     var c = doc.sessions.length && current();
     return c && c.raw ? c.raw : null;
   }
-
   function emptyDoc() {
     return { v: 1, title: '', sessions: [], savedAt: 0, downloadedAt: 0, changedAt: 0 };
   }
@@ -63,6 +73,7 @@
 
   /* ev is an event WITHOUT its leading dt. */
   function record(ev, now) {
+    now = now || Date.now();
     ensureSession(now);
     var raw = openRaw();
     var dt = raw.events.length ? Math.max(0, now - raw.last) : Math.max(0, now - raw.start);
@@ -75,30 +86,263 @@
     scheduleSave();
   }
 
-  /* A drand checkpoint: fetched, never sent. If offline, the writing is
-     simply recorded without one — it is a bonus, not a requirement. */
+  /* A drand checkpoint: fetched, never sent. Offline, it is simply skipped. */
   function checkpoint(now) {
     lastDrand = now;
     S.drand.latest().then(function (r) {
       if (!r || locked) return;
-      record(['r', r.round, r.randomness, r.signature], Date.now());
+      record(['r', r.round, r.randomness, r.signature]);
     });
   }
 
-  /* Old text → new text as one deletion and/or one insertion. The caret
-     decides between equally valid answers: typing "l" after "l" could be
-     an insertion at either position, and only the caret knows which. */
-  function diff(ov, nv, caret) {
-    var dl = nv.length - ov.length, p;
-    if (dl > 0) {
-      p = caret - dl;
-      if (p >= 0 && nv.slice(0, p) === ov.slice(0, p) && nv.slice(caret) === ov.slice(p))
-        return { pos: p, del: '', ins: nv.slice(p, caret) };
-    } else if (dl < 0) {
-      p = caret;
-      if (nv.slice(0, p) === ov.slice(0, p) && nv.slice(p) === ov.slice(p - dl))
-        return { pos: p, del: ov.slice(p, p - dl), ins: '' };
+  /* ---- Edits on the model, with undo ------------------------------------
+     The inverse of each step is computed from the model BEFORE the step is
+     applied, so undo restores origin and formatting exactly: a pasted
+     quote that is deleted and undone comes back as pasted. */
+
+  var undoStack = [], redoStack = [];
+  var lastGroup = null;
+
+  function inverseOf(ev) {
+    var t = ev[0];
+    if (t === 'i' || t === 'p') return [['d', ev[1], ev[2]]];
+    if (t === 'd') {
+      var out = [], at = ev[1];
+      state.spans.slice(ev[1], ev[1] + ev[2].length).forEach(function (r) {
+        out.push([r.p === 1 ? 'p' : 'i', at, ev[2].substr(at - ev[1], r.n), r.f || 0]);
+        at += r.n;
+      });
+      return out;
     }
+    if (t === 'f') {
+      var res = [], a = ev[1];
+      state.spans.slice(ev[1], ev[2]).forEach(function (r) {
+        res.push(['f', a, a + r.n, ev[3], (r.f & ev[3]) ? 1 : 0]);
+        a += r.n;
+      });
+      return res;
+    }
+    return [];
+  }
+
+  /* Applies steps as one undoable group. Returns the inverse steps. */
+  function applySteps(steps, now) {
+    var inv = [];
+    steps.forEach(function (ev) {
+      if ((ev[0] === 'd' || ev[0] === 'i' || ev[0] === 'p') && !ev[2]) return;
+      inv = inverseOf(ev).reverse().concat(inv);
+      record(ev, now);
+    });
+    return inv;
+  }
+
+  /* kind 'type' merges with the previous typing group if it was recent. */
+  function edit(steps, kind) {
+    var now = Date.now();
+    var inv = applySteps(steps, now);
+    if (!inv.length) return;
+    if (kind === 'type' && lastGroup && lastGroup.kind === 'type' && now - lastGroup.t < UNDO_MERGE_MS) {
+      lastGroup.inv = inv.concat(lastGroup.inv);
+      lastGroup.t = now;
+    } else {
+      lastGroup = { kind: kind, inv: inv, t: now };
+      undoStack.push(lastGroup);
+      if (undoStack.length > 300) undoStack.shift();
+    }
+    redoStack = [];
+  }
+
+  function caretAfter(ev) {
+    if (!ev) return [state.text.length, state.text.length];
+    if (ev[0] === 'i' || ev[0] === 'p') return [ev[1] + ev[2].length, ev[1] + ev[2].length];
+    if (ev[0] === 'd') return [ev[1], ev[1]];
+    return [ev[1], ev[2]];
+  }
+
+  function undo() {
+    var g = undoStack.pop();
+    if (!g) return;
+    lastGroup = null;
+    redoStack.push({ inv: applySteps(g.inv, Date.now()) });
+    render(caretAfter(g.inv[g.inv.length - 1]));
+  }
+  function redo() {
+    var g = redoStack.pop();
+    if (!g) return;
+    lastGroup = null;
+    undoStack.push({ kind: 'redo', inv: applySteps(g.inv, Date.now()) });
+    render(caretAfter(g.inv[g.inv.length - 1]));
+  }
+
+  /* ---- Formatting -------------------------------------------------------- */
+
+  function lineStart(pos) { return state.text.lastIndexOf('\n', pos - 1) + 1; }
+  function lineEnd(pos) { var e = state.text.indexOf('\n', pos); return e === -1 ? state.text.length : e; }
+
+  /* Formatting for new text at pos: the character before it on the same
+     line, or after it at the start of a line. A pending choice wins. */
+  function formatFor(pos) {
+    if (pending && pending.at === pos) return pending.f;
+    var ls = lineStart(pos);
+    if (pos > ls) return state.spans.formatAt(pos - 1);
+    return pos < lineEnd(pos) ? state.spans.formatAt(pos) : 0;
+  }
+
+  function toggle(kind) {
+    if (!ready || locked) return;
+    var sel = getSel();
+    var bit = BITS[kind];
+    if (kind === 'heading') {
+      var a = lineStart(sel[0]), b = lineEnd(sel[1]);
+      if (a === b) {   /* empty line: the heading applies to what is typed next */
+        pending = { at: a, f: formatFor(a) ^ HEADING };
+        render(sel);
+        return;
+      }
+      edit([['f', a, b, HEADING, (state.spans.formatAt(a) & HEADING) ? 0 : 1]], 'format');
+      render(sel);
+      return;
+    }
+    if (sel[0] === sel[1]) {
+      pending = { at: sel[0], f: formatFor(sel[0]) ^ bit };
+      syncButtons();
+      return;
+    }
+    var all = state.spans.slice(sel[0], sel[1]).every(function (r) { return r.f & bit; });
+    edit([['f', sel[0], sel[1], bit, all ? 0 : 1]], 'format');
+    render(sel);
+  }
+
+  /* ---- Rendering: model → sheet ------------------------------------------ */
+
+  function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  function render(sel) {
+    var text = state.text, runs = state.spans.runs;
+    var lines = text.split('\n');
+    var html = '', at = 0, ri = 0, rOff = 0;
+    for (var li = 0; li < lines.length; li++) {
+      var end = at + lines[li].length, inner = '';
+      var heading = end > at ? !!(state.spans.formatAt(at) & HEADING)
+                             : !!(pending && pending.at === at && pending.f & HEADING);
+      var pos = at;
+      while (pos < end) {
+        while (ri < runs.length && rOff + runs[ri].n <= pos) { rOff += runs[ri].n; ri++; }
+        var r = runs[ri], stop = Math.min(end, rOff + r.n);
+        var cls = [];
+        if (r.p === 1) cls.push('mark-pasted');
+        if (r.f & BOLD) cls.push('f-b');
+        if (r.f & ITALIC) cls.push('f-i');
+        if (r.f & UNDERLINE) cls.push('f-u');
+        inner += '<span' + (cls.length ? ' class="' + cls.join(' ') + '"' : '') + '>' + esc(text.slice(pos, stop)) + '</span>';
+        pos = stop;
+      }
+      html += '<div class="ln' + (heading ? ' ln--h' : '') + '">' + (inner || '<br>') + '</div>';
+      at = end + 1;
+    }
+    ed.innerHTML = html;
+    if (sel && document.activeElement === ed) setSel(sel[0], sel[1]);
+    stats();
+    syncButtons();
+  }
+
+  /* ---- Positions: sheet ↔ model ------------------------------------------ */
+
+  function lineStarts() {
+    var out = [0], t = state.text;
+    for (var i = 0; i < t.length; i++) if (t.charCodeAt(i) === 10) out.push(i + 1);
+    return out;
+  }
+  function textLen(n) { return n.nodeType === 3 ? n.data.length : (n.textContent || '').length; }
+
+  /* (node, offset) in the sheet → model offset. */
+  function toModel(node, offset) {
+    var starts = lineStarts();
+    if (node === ed) {
+      if (offset >= ed.childNodes.length) return state.text.length;
+      return starts[Math.min(offset, starts.length - 1)] || 0;
+    }
+    var line = node;
+    while (line && line.parentNode !== ed) line = line.parentNode;
+    if (!line) return 0;
+    var base = starts[Array.prototype.indexOf.call(ed.childNodes, line)] || 0;
+    var count = 0, done = false;
+    (function walk(n) {
+      if (done) return;
+      if (n === node) {
+        if (n.nodeType === 3) count += offset;
+        else for (var i = 0; i < offset && i < n.childNodes.length; i++) count += textLen(n.childNodes[i]);
+        done = true;
+        return;
+      }
+      if (n.nodeType === 3) { count += n.data.length; return; }
+      for (var c = n.firstChild; c; c = c.nextSibling) walk(c);
+    })(line);
+    return Math.min(base + count, state.text.length);
+  }
+
+  /* Model offset → (node, offset) in the sheet. */
+  function toDom(pos) {
+    var starts = lineStarts(), li = starts.length - 1;
+    while (li > 0 && starts[li] > pos) li--;
+    var line = ed.childNodes[li];
+    if (!line) return { node: ed, offset: ed.childNodes.length };
+    var rem = pos - starts[li];
+    var walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
+    var t, last = null;
+    while ((t = walker.nextNode())) {
+      last = t;
+      if (rem <= t.data.length) return { node: t, offset: rem };
+      rem -= t.data.length;
+    }
+    return last ? { node: last, offset: last.data.length } : { node: line, offset: 0 };
+  }
+
+  function getSel() {
+    var s = window.getSelection();
+    if (!s.rangeCount || !ed.contains(s.anchorNode)) {
+      return [Math.min(state.caret, state.sel), Math.max(state.caret, state.sel)];
+    }
+    var a = toModel(s.anchorNode, s.anchorOffset), b = toModel(s.focusNode, s.focusOffset);
+    return a <= b ? [a, b] : [b, a];
+  }
+  function setSel(a, b) {
+    if (b == null) b = a;
+    var s = window.getSelection(), r = document.createRange();
+    var x = toDom(a), y = toDom(b);
+    try { r.setStart(x.node, x.offset); r.setEnd(y.node, y.offset); } catch (e) { return; }
+    s.removeAllRanges();
+    s.addRange(r);
+    state.caret = a; state.sel = b;
+  }
+
+  /* The sheet's text as the model would have it: one line per block. */
+  function sheetText() {
+    var lines = [], cur = null;
+    for (var c = ed.firstChild; c; c = c.nextSibling) {
+      if (c.nodeType === 1 && /^(DIV|P|H\d|LI)$/.test(c.nodeName)) { lines.push(blockText(c)); cur = null; }
+      else {
+        var t = c.nodeType === 3 ? c.data : (c.nodeName === 'BR' ? '' : c.textContent);
+        if (cur === null) { lines.push(t); cur = lines.length - 1; } else lines[cur] += t;
+      }
+    }
+    return lines.join('\n').replace(/ /g, ' ');
+  }
+  function blockText(el) {
+    var out = '';
+    (function walk(n) {
+      for (var c = n.firstChild; c; c = c.nextSibling) {
+        if (c.nodeType === 3) out += c.data;
+        else if (c.nodeName === 'BR') { if (c.nextSibling) out += '\n'; }
+        else if (/^(DIV|P)$/.test(c.nodeName)) { if (out) out += '\n'; walk(c); }
+        else walk(c);
+      }
+    })(el);
+    return out;
+  }
+
+  /* Old text → new text as one deletion and/or one insertion. */
+  function diff(ov, nv) {
     var a = 0, max = Math.min(ov.length, nv.length);
     while (a < max && ov.charCodeAt(a) === nv.charCodeAt(a)) a++;
     var b = 0;
@@ -106,114 +350,222 @@
     return { pos: a, del: ov.slice(a, ov.length - b), ins: nv.slice(a, nv.length - b) };
   }
 
-  var PASTE_TYPES = { insertFromPaste: 1, insertFromDrop: 1, insertFromPasteAsQuotation: 1, insertFromYank: 1 };
-
-  /* Undo and redo can put text back. Text that comes back keeps the origin
-     it had when it was deleted, so "paste, undo, redo" is still a paste.
-     Anything longer than a character that comes back from history and was
-     NOT deleted here recently is logged as pasted — the safe side. */
-  var recentDeleted = [];
-  function rememberDeleted(pos, text) {
-    var flags = state.spans.flags().subarray(pos, pos + text.length);
-    recentDeleted.push({ text: text, pasted: flags.indexOf(1) !== -1 });
-    if (recentDeleted.length > 50) recentDeleted.shift();
+  /* The sheet changed by itself: bring the model in line, then redraw. */
+  function syncFromSheet(kind) {
+    var nv = sheetText();
+    if (nv === state.text) return false;
+    var d = diff(state.text, nv);
+    var steps = [];
+    if (d.del) steps.push(['d', d.pos, d.del]);
+    if (d.ins) steps.push([kind, d.pos, d.ins, formatFor(d.pos)]);
+    edit(steps, kind === 'i' ? 'type' : 'paste');
+    render([d.pos + d.ins.length, d.pos + d.ins.length]);
+    return true;
   }
-  function historyOrigin(text) {
-    for (var i = recentDeleted.length - 1; i >= 0; i--) {
-      if (recentDeleted[i].text === text) return recentDeleted[i].pasted ? 'p' : 'i';
+
+  /* ---- Input -------------------------------------------------------------- */
+
+  function insertText(str, kind) {
+    var sel = getSel();
+    var f = formatFor(sel[0]);
+    if (str === '\n') f = 0;                 /* Enter: the new line starts plain */
+    else if (kind === 'p') f &= ~HEADING;
+    var steps = [];
+    if (sel[1] > sel[0]) steps.push(['d', sel[0], state.text.slice(sel[0], sel[1])]);
+    steps.push([kind, sel[0], str, f]);
+    pending = null;
+    edit(steps, kind === 'i' && str !== '\n' ? 'type' : 'other');
+    render([sel[0] + str.length, sel[0] + str.length]);
+  }
+
+  function deleteRange(a, b) {
+    if (b <= a) return;
+    pending = null;
+    edit([['d', a, state.text.slice(a, b)]], 'type');
+    render([a, a]);
+  }
+
+  ed.addEventListener('beforeinput', function (e) {
+    if (!ready || locked) { e.preventDefault(); return; }
+    var t = e.inputType;
+    if (t === 'insertCompositionText' || e.isComposing) return;   /* let the IME work; synced after */
+    if (t === 'historyUndo') { e.preventDefault(); undo(); return; }
+    if (t === 'historyRedo') { e.preventDefault(); redo(); return; }
+    if (t === 'formatBold' || t === 'formatItalic' || t === 'formatUnderline') {
+      e.preventDefault();
+      toggle({ formatBold: 'bold', formatItalic: 'italic', formatUnderline: 'underline' }[t]);
+      return;
     }
-    return text.length > 1 ? 'p' : 'i';
-  }
-
-  function applyDiff(nv, kind, now) {
-    var d = diff(state.text, nv, ta.selectionStart);
-    if (d.del) { rememberDeleted(d.pos, d.del); record(['d', d.pos, d.del], now); }
-    if (d.ins) {
-      var k = kind === 'history' ? historyOrigin(d.ins) : kind;
-      record([k, d.pos, d.ins], now);
+    if (t === 'insertText' || t === 'insertReplacementText') {
+      var data = e.data != null ? e.data : (e.dataTransfer && e.dataTransfer.getData('text/plain'));
+      if (data == null) return;   /* unknown: let it happen, then sync */
+      e.preventDefault();
+      insertText(data, 'i');
+      return;
     }
-  }
+    if (t === 'insertParagraph' || t === 'insertLineBreak') { e.preventDefault(); insertText('\n', 'i'); return; }
+    if (t === 'insertFromPaste' || t === 'insertFromDrop' || t === 'insertFromPasteAsQuotation') {
+      var txt = e.dataTransfer && e.dataTransfer.getData('text/plain');
+      if (txt == null) return;
+      e.preventDefault();
+      insertText(txt.replace(/\r\n?/g, '\n'), 'p');
+      return;
+    }
+    if (t.indexOf('delete') === 0) {
+      e.preventDefault();
+      var ranges = e.getTargetRanges ? e.getTargetRanges() : [];
+      if (ranges.length) {
+        var a = toModel(ranges[0].startContainer, ranges[0].startOffset);
+        var b = toModel(ranges[0].endContainer, ranges[0].endOffset);
+        if (b > a) { deleteRange(a, b); return; }
+      }
+      var sel = getSel();
+      if (sel[1] > sel[0]) deleteRange(sel[0], sel[1]);
+      else if (t.indexOf('Backward') !== -1 && sel[0] > 0) deleteRange(sel[0] - 1, sel[0]);
+      else if (t.indexOf('Forward') !== -1 && sel[0] < state.text.length) deleteRange(sel[0], sel[0] + 1);
+      return;
+    }
+    if (t.indexOf('format') === 0) e.preventDefault();   /* no other formatting */
+  });
 
-  /* The field changed without telling us — something other than the
-     keyboard wrote into it. Logged as pasted before the next real input. */
+  /* Whatever got past beforeinput. */
+  ed.addEventListener('input', function (e) {
+    if (!ready || locked || composing) return;
+    syncFromSheet(e.inputType && e.inputType.indexOf('insertFrom') === 0 ? 'p' : 'i');
+  });
+  ed.addEventListener('compositionstart', function () { composing = true; });
+  ed.addEventListener('compositionend', function () {
+    composing = false;
+    setTimeout(function () { syncFromSheet('i'); }, 0);
+  });
+
+  /* Paste and drop are taken as plain text and logged as pasted. */
+  ed.addEventListener('paste', function (e) {
+    e.preventDefault();
+    if (!ready || locked) return;
+    var t = (e.clipboardData || window.clipboardData).getData('text/plain');
+    if (t) insertText(t.replace(/\r\n?/g, '\n'), 'p');
+  });
+  ed.addEventListener('drop', function (e) {
+    var t = e.dataTransfer && e.dataTransfer.getData('text/plain');
+    e.preventDefault();
+    if (!t || !ready || locked) return;
+    if (document.caretRangeFromPoint) {
+      var r = document.caretRangeFromPoint(e.clientX, e.clientY);
+      if (r) { var p = toModel(r.startContainer, r.startOffset); setSel(p, p); }
+    }
+    insertText(t.replace(/\r\n?/g, '\n'), 'p');
+  });
+
+  /* Something wrote into the sheet without any event (rare): pasted. */
   function syncExternal() {
-    if (!ready || locked || ta.value === state.text) return;
-    applyDiff(ta.value, 'p', Date.now());
-    render();
+    if (ready && !locked && !composing && document.activeElement !== ed) syncFromSheet('p');
   }
 
-  function onInput(e) {
-    if (!ready || locked) return;
-    var nv = ta.value;
-    if (nv === state.text) return;
-    var now = Date.now();
-    var type = (e && e.inputType) || lastInputType || '';
-    var kind = pendingPaste || PASTE_TYPES[type] ? 'p' : /^history/.test(type) ? 'history' : 'i';
-    pendingPaste = false;
-    lastInputType = '';
-    applyDiff(nv, kind, now);
-    if (state.text !== nv) {
-      /* Should be impossible; if it ever happens, the model wins and the
-         textarea is put back, rather than letting the two drift apart. */
-      console.error('skriftspor: modellen og tekstfeltet er ulike — tekstfeltet tilbakestilles');
-      ta.value = state.text;
-    }
-    state.caret = ta.selectionStart; state.sel = ta.selectionEnd;
-    render();
+  /* Copying out of the sheet: the model's own text and formatting. */
+  function copySelection(e, cut) {
+    var sel = getSel();
+    if (sel[1] <= sel[0]) return;
+    e.preventDefault();
+    e.clipboardData.setData('text/plain', state.text.slice(sel[0], sel[1]));
+    e.clipboardData.setData('text/html', toHtml(sel[0], sel[1]));
+    if (cut && !locked) deleteRange(sel[0], sel[1]);
   }
+  ed.addEventListener('copy', function (e) { copySelection(e, false); });
+  ed.addEventListener('cut', function (e) { copySelection(e, true); });
 
-  /* Cursor jumps: logged when the selection ends up somewhere the last
-     edit did not leave it. Debounced, so holding an arrow key is one
-     event, not forty. */
+  ed.addEventListener('keydown', function (e) {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    var k = e.key.toLowerCase();
+    var fmt = { b: 'bold', i: 'italic', u: 'underline' }[k];
+    if (fmt) { e.preventDefault(); toggle(fmt); return; }
+    if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
+    if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo(); }
+  });
+
+  /* Cursor jumps: logged when the selection settles somewhere the last
+     edit did not leave it. Debounced, so holding an arrow key is one event. */
   var cursorTimer = null;
-  function onCursor() {
-    if (!ready || locked) return;
+  document.addEventListener('selectionchange', function () {
+    if (!ready || locked || document.activeElement !== ed) return;
+    syncButtons();
     clearTimeout(cursorTimer);
     cursorTimer = setTimeout(function () {
-      if (ta.value !== state.text || !openRaw() && !state.text) return;
-      var a = ta.selectionStart, b = ta.selectionEnd;
-      if (a === state.caret && b === state.sel) return;
-      record(['c', a, b], Date.now());
+      if (composing || !state.text) return;
+      var s = getSel();
+      if (pending && pending.at !== s[0]) { pending = null; syncButtons(); }
+      if (s[0] === Math.min(state.caret, state.sel) && s[1] === Math.max(state.caret, state.sel)) return;
+      record(['c', s[0], s[1]]);
     }, CURSOR_DEBOUNCE_MS);
-  }
+  });
 
-  /* ---- Rendering ------------------------------------------------------- */
-
-  function esc(s) {
-    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-
-  var raf = 0;
-  function render() {
-    if (raf) return;
-    raf = requestAnimationFrame(function () {
-      raf = 0;
-      var html = '', at = 0, text = state.text;
-      state.spans.runs.forEach(function (r) {
-        var seg = esc(text.slice(at, at + r.n));
-        html += r.p === 1 ? '<mark class="mark-pasted">' + seg + '</mark>' : seg;
-        at += r.n;
-      });
-      /* A trailing newline only takes up a line if something follows it. */
-      mirror.innerHTML = html + ' ';
-      autosize();
-      stats();
+  /* The buttons show the format at the caret: aria-pressed and a fill. */
+  function syncButtons() {
+    var sel = getSel(), f;
+    if (sel[1] > sel[0]) {
+      f = 15;
+      state.spans.slice(sel[0], sel[1]).forEach(function (r) { f &= r.f || 0; });
+    } else f = formatFor(sel[0]);
+    if (sel[1] === sel[0]) {
+      var ls = lineStart(sel[0]);
+      if (ls < lineEnd(sel[0]) && state.spans.formatAt(ls) & HEADING) f |= HEADING;
+    }
+    [].forEach.call(document.querySelectorAll('[data-format]'), function (btn) {
+      btn.setAttribute('aria-pressed', f & BITS[btn.getAttribute('data-format')] ? 'true' : 'false');
     });
   }
 
-  function autosize() {
-    ta.style.height = 'auto';
-    ta.style.height = Math.max(ta.scrollHeight, mirror.scrollHeight) + 'px';
+  [].forEach.call(document.querySelectorAll('[data-format]'), function (btn) {
+    btn.addEventListener('mousedown', function (e) { e.preventDefault(); });   /* keep the selection */
+    btn.addEventListener('click', function () {
+      if (document.activeElement !== ed) { ed.focus(); setSel(state.caret, state.sel); }
+      toggle(btn.getAttribute('data-format'));
+    });
+  });
+
+  /* ---- Copy all, as formatted HTML + plain text -------------------------- */
+
+  function toHtml(a, b) {
+    var text = state.text, out = '', pos = a;
+    text.slice(a, b).split('\n').forEach(function (line) {
+      var end = pos + line.length, inner = '', at = pos;
+      state.spans.slice(pos, end).forEach(function (r) {
+        var seg = esc(text.substr(at, r.n));
+        if (r.f & UNDERLINE) seg = '<u>' + seg + '</u>';
+        if (r.f & ITALIC) seg = '<i>' + seg + '</i>';
+        if (r.f & BOLD) seg = '<b>' + seg + '</b>';
+        inner += seg;
+        at += r.n;
+      });
+      var h = line.length && (state.spans.formatAt(pos) & HEADING);
+      out += h ? '<h2>' + inner + '</h2>' : '<p>' + (inner || '<br>') + '</p>';
+      pos = end + 1;
+    });
+    return out;
   }
+
+  function copyText() {
+    var html = toHtml(0, state.text.length), txt = state.text;
+    var onCopy = function (e) {
+      e.clipboardData.setData('text/html', html);
+      e.clipboardData.setData('text/plain', txt);
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    };
+    document.addEventListener('copy', onCopy, true);
+    var ok = document.execCommand('copy');
+    document.removeEventListener('copy', onCopy, true);
+    if (!ok && navigator.clipboard) navigator.clipboard.writeText(txt);
+    showToast('Kopiert');
+  }
+
+  /* ---- Status and saving ------------------------------------------------- */
 
   function stats() {
     var c = state.spans.counts();
     var len = state.text.length;
-    var words = S.countWords(state.text);
     var pct = len ? Math.round(1000 * c.pasted / len) / 10 : 0;
-    statsEl.textContent = words + (words === 1 ? ' ord' : ' ord') +
-      ' · ' + S.fmtPct(pct) + ' innlimt' +
-      ' · økt ' + Math.max(1, doc.sessions.length);
+    statsEl.textContent = S.countWords(state.text) + ' ord · ' + S.fmtPct(pct) + ' innlimt · økt ' + Math.max(1, doc.sessions.length);
   }
 
   function clock(ms) {
@@ -229,8 +581,6 @@
       doc.savedAt ? 'Lagret i nettleseren ' + clock(doc.savedAt) + ' · ikke lastet ned' : '';
     statusEl.classList.toggle('is-warn', !!state.text && dirty);
   }
-
-  /* ---- Saving ---------------------------------------------------------- */
 
   var saveTimer = null;
   function scheduleSave() {
@@ -249,18 +599,17 @@
     status();
   }
 
-  /* Two tabs on the same document would overwrite each other's log. The
-     second one to change it locks the first. */
+  /* Two tabs on the same document would overwrite each other's log. */
   window.addEventListener('storage', function (e) {
     if (e.key !== S.local.key || locked) return;
     locked = true;
-    ta.readOnly = true;
+    ed.contentEditable = 'false';
     titleInput.readOnly = true;
     statusEl.textContent = 'Åpnet i en annen fane. Last siden på nytt for å fortsette her.';
     statusEl.classList.add('is-warn');
   });
 
-  /* ---- Actions --------------------------------------------------------- */
+  /* ---- Actions ----------------------------------------------------------- */
 
   function download() {
     save();
@@ -280,54 +629,19 @@
     });
   }
 
-  /* Copy as rich text as well as plain, so pasting into Word or Docs
-     keeps headings, bold, italics and underline. Only the four forms the
-     toolbar makes are converted; everything else is copied as written. */
-  function inline(t) {
-    return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/&lt;u&gt;([\s\S]+?)&lt;\/u&gt;/g, '<u>$1</u>')
-      .replace(/\*\*([^*\n]+?)\*\*/g, '<b>$1</b>')
-      .replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1<i>$2</i>');
-  }
-  function toHtml(text) {
-    return text.split(/\n{2,}/).map(function (block) {
-      var h = block.match(/^(#{1,3})\s+(.*)$/);
-      if (h && block.indexOf('\n') === -1) return '<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>';
-      return block.split('\n').map(function (line) {
-        var hh = line.match(/^(#{1,3})\s+(.*)$/);
-        return hh ? '<h' + hh[1].length + '>' + inline(hh[2]) + '</h' + hh[1].length + '>' : inline(line);
-      }).join('<br>').replace(/^(?!<h)(.*)$/s, '<p>$1</p>');
-    }).join('');
-  }
-  function plain(text) {
-    return text.replace(/^#{1,3}\s+/gm, '').replace(/<\/?u>/g, '')
-      .replace(/\*\*([^*\n]+?)\*\*/g, '$1').replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1$2');
-  }
-
-  function copyText() {
-    var html = toHtml(state.text), txt = plain(state.text);
-    var onCopy = function (e) {
-      e.clipboardData.setData('text/html', html);
-      e.clipboardData.setData('text/plain', txt);
-      e.preventDefault();
-    };
-    document.addEventListener('copy', onCopy);
-    var ok = document.execCommand('copy');
-    document.removeEventListener('copy', onCopy);
-    if (!ok && navigator.clipboard) navigator.clipboard.writeText(txt);
-    showToast('Kopiert');
-  }
-
-  function newText() {
-    if (state.text && !confirm('Starte på en ny tekst? Teksten du har nå blir slettet fra denne nettleseren.' +
-        (doc.changedAt > doc.downloadedAt ? '\n\nDu har ikke lastet ned spor-fila etter siste endring.' : ''))) return;
+  function reset() {
     S.local.clear();
     doc = emptyDoc();
     state = new S.State('');
-    ta.value = '';
+    undoStack = []; redoStack = []; lastGroup = null; pending = null;
     titleInput.value = '';
-    render(); status();
-    ta.focus();
+    render();
+    status();
+  }
+
+  function confirmDiscard() {
+    return !state.text || confirm('Starte på en ny tekst? Teksten du har nå blir slettet fra denne nettleseren.' +
+      (doc.changedAt > doc.downloadedAt ? '\n\nDu har ikke lastet ned spor-fila etter siste endring.' : ''));
   }
 
   function resume(file) {
@@ -346,12 +660,11 @@
         doc.sessions = parsed.sessions.map(function (s) { return { stored: s }; });
         doc.downloadedAt = doc.changedAt = Date.now();
         state = rep.replay.state;
-        ta.value = state.text;
+        undoStack = []; redoStack = []; lastGroup = null; pending = null;
         titleInput.value = doc.title;
-        save(); render();
-        ta.focus();
-        ta.setSelectionRange(state.text.length, state.text.length);
-        state.caret = state.sel = state.text.length;
+        save();
+        ed.focus();
+        render([state.text.length, state.text.length]);
       });
     };
     reader.readAsText(file);
@@ -365,71 +678,14 @@
     toastTimer = setTimeout(function () { toast.hidden = true; }, 2500);
   }
 
-  /* ---- Formatting ------------------------------------------------------
-     Markdown, written into the text itself: "# " for a heading, **bold**,
-     *italic*, and <u>underline</u> (Markdown has no underline; inline
-     HTML is what Markdown readers accept for it). Each marker is inserted
-     with execCommand('insertText'), so it goes through the normal input
-     path: it is logged as typed, undo works, and the selected text keeps
-     its own origin (a pasted quote made bold stays pasted). */
+  /* ---- Wiring ------------------------------------------------------------ */
 
-  function insertAt(pos, str) {
-    ta.focus();
-    ta.setSelectionRange(pos, pos);
-    if (!document.execCommand('insertText', false, str)) {
-      ta.setRangeText(str, pos, pos, 'end');
-      onInput({ inputType: 'insertText' });
-    }
-  }
-
-  var WRAP = { bold: ['**', '**'], italic: ['*', '*'], underline: ['<u>', '</u>'] };
-
-  function format(kind) {
-    if (!ready || locked) return;
-    var a = ta.selectionStart, b = ta.selectionEnd, v = ta.value;
-    if (kind === 'heading') {
-      var ls = v.lastIndexOf('\n', a - 1) + 1;
-      if (v.slice(ls, ls + 2) === '# ') {
-        ta.focus(); ta.setSelectionRange(ls, ls + 2);
-        document.execCommand('delete');
-        ta.setSelectionRange(Math.max(ls, a - 2), Math.max(ls, b - 2));
-      } else {
-        insertAt(ls, '# ');
-        ta.setSelectionRange(a + 2, b + 2);
-      }
-      return;
-    }
-    var w = WRAP[kind];
-    insertAt(b, w[1]);          /* the end first, so a is still valid */
-    insertAt(a, w[0]);
-    if (a === b) ta.setSelectionRange(a + w[0].length, a + w[0].length);
-    else ta.setSelectionRange(a + w[0].length, b + w[0].length);
-  }
-
-  [].forEach.call(document.querySelectorAll('[data-format]'), function (btn) {
-    btn.addEventListener('mousedown', function (e) { e.preventDefault(); });   /* keep the selection */
-    btn.addEventListener('click', function () { format(btn.getAttribute('data-format')); });
-  });
-  ta.addEventListener('keydown', function (e) {
-    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
-    var k = { b: 'bold', i: 'italic', u: 'underline' }[e.key.toLowerCase()];
-    if (k) { e.preventDefault(); format(k); }
-  });
-
-  /* ---- Wiring ---------------------------------------------------------- */
-
-  ta.addEventListener('beforeinput', function (e) { syncExternal(); lastInputType = e.inputType || ''; });
-  ta.addEventListener('paste', function () { pendingPaste = true; });
-  ta.addEventListener('drop', function () { pendingPaste = true; });
-  ta.addEventListener('input', onInput);
-  ['keyup', 'mouseup', 'select', 'focus'].forEach(function (t) { ta.addEventListener(t, onCursor); });
-  document.addEventListener('selectionchange', function () { if (document.activeElement === ta) onCursor(); });
   titleInput.addEventListener('input', scheduleSave);
-  window.addEventListener('resize', function () { render(); });
-
   document.getElementById('btn-download').addEventListener('click', download);
   document.getElementById('btn-copy').addEventListener('click', copyText);
-  document.getElementById('btn-new').addEventListener('click', newText);
+  document.getElementById('btn-new').addEventListener('click', function () {
+    if (confirmDiscard()) { reset(); ed.focus(); }
+  });
   document.getElementById('btn-resume').addEventListener('click', function () { fileInput.click(); });
   fileInput.addEventListener('change', function () { if (fileInput.files[0]) resume(fileInput.files[0]); fileInput.value = ''; });
   document.getElementById('btn-play').addEventListener('click', function () {
@@ -437,10 +693,8 @@
     if (window.SkriftsporInbox) window.SkriftsporInbox.loadLocal();
   });
 
-  /* Leaving the page with changes that are not in a downloaded spor-file.
-     The text is safe in this browser either way, but a student on a shared
-     or wiped school computer loses it — so the browser asks first. Browsers
-     show their own wording; the text here is ignored by all of them. */
+  /* Leaving with changes that are not in a downloaded spor-file: the
+     browser asks first, in its own words. */
   window.addEventListener('beforeunload', function (e) {
     if (locked || !state.text || doc.changedAt <= doc.downloadedAt) return;
     save();
@@ -450,14 +704,17 @@
 
   /* Ctrl/Cmd+S downloads the file rather than saving the web page. */
   document.addEventListener('keydown', function (e) {
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && document.body.getAttribute('data-view') === 'write') { e.preventDefault(); download(); }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's' && document.body.getAttribute('data-view') === 'write') {
+      e.preventDefault();
+      download();
+    }
   });
 
-  /* ---- Start: rebuild the text from the stored log ---------------------- */
+  /* ---- Start: rebuild the text from the stored log ----------------------- */
 
   doc = S.local.load() || emptyDoc();
   titleInput.value = doc.title || '';
-  ta.readOnly = true;
+  ed.contentEditable = 'false';
   S.finalize(doc.sessions).then(function (f) {
     state = f.state;
   }).catch(function (e) {
@@ -466,38 +723,30 @@
     doc = emptyDoc();
     state = new S.State('');
   }).then(function () {
-    ta.value = state.text;
-    ta.readOnly = false;
+    ed.contentEditable = 'true';
     ready = true;
     state.caret = state.sel = state.text.length;
-    render(); status();
+    render();
+    status();
     document.dispatchEvent(new CustomEvent('skriftspor:writer-ready'));
   });
 
   /* For js/inbox.js, which owns the views. */
   window.SkriftsporWriter = {
+    ready: function () { return ready; },
     hasText: function () { return !!state.text; },
     title: function () { return doc.title || ''; },
     show: function () {
-      render();
-      ta.focus();
-      ta.setSelectionRange(state.text.length, state.text.length);
+      ed.focus();
+      render([state.text.length, state.text.length]);
     },
     startNew: function () {
-      if (state.text && !confirm('Starte på en ny tekst? Teksten du har nå blir slettet fra denne nettleseren.' +
-          (doc.changedAt > doc.downloadedAt ? '\n\nDu har ikke lastet ned spor-fila etter siste endring.' : ''))) return false;
-      if (state.text) {
-        S.local.clear();
-        doc = emptyDoc();
-        state = new S.State('');
-        ta.value = '';
-        titleInput.value = '';
-        status();
-      }
+      if (!confirmDiscard()) return false;
+      if (state.text) reset();
       return true;
     }
   };
 
   setInterval(status, 30000);
-  setInterval(syncExternal, 1000);
+  setInterval(syncExternal, 2000);
 })();

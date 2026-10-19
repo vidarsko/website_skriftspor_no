@@ -399,6 +399,6 @@
     else if (location.hash === '#lokal') { history.replaceState({ view: 'start' }, '', '/'); setView('start'); loadLocal(); }
     else { history.replaceState({ view: 'start' }, ''); setView('start'); }
   }
-  if (window.SkriftsporWriter && document.getElementById('write-input').readOnly === false) boot();
+  if (window.SkriftsporWriter && window.SkriftsporWriter.ready()) boot();
   else document.addEventListener('skriftspor:writer-ready', boot, { once: true });
 })();

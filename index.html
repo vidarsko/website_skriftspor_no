@@ -79,15 +79,13 @@
       <section class="band writearea">
         <div class="band__inner writearea__inner">
           <div class="formatbar" role="toolbar" aria-label="Formatering">
-            <button type="button" class="formatbar__btn" data-format="heading" title="Overskrift (# )" aria-label="Overskrift">H</button>
-            <button type="button" class="formatbar__btn" data-format="bold" title="Fet (Ctrl+B)" aria-label="Fet"><b>B</b></button>
-            <button type="button" class="formatbar__btn" data-format="italic" title="Kursiv (Ctrl+I)" aria-label="Kursiv"><i>I</i></button>
-            <button type="button" class="formatbar__btn" data-format="underline" title="Understreket (Ctrl+U)" aria-label="Understreket"><u>U</u></button>
+            <button type="button" class="formatbar__btn" data-format="heading" title="Overskrift" aria-label="Overskrift" aria-pressed="false">H</button>
+            <button type="button" class="formatbar__btn" data-format="bold" title="Fet (Ctrl+B)" aria-label="Fet" aria-pressed="false"><b>B</b></button>
+            <button type="button" class="formatbar__btn" data-format="italic" title="Kursiv (Ctrl+I)" aria-label="Kursiv" aria-pressed="false"><i>I</i></button>
+            <button type="button" class="formatbar__btn" data-format="underline" title="Understreket (Ctrl+U)" aria-label="Understreket" aria-pressed="false"><u>U</u></button>
           </div>
           <div class="sheet">
-            <div class="sheet__mirror" id="write-mirror" aria-hidden="true"></div>
-            <label for="write-input" class="visually-hidden">Teksten din</label>
-            <textarea id="write-input" class="sheet__input" spellcheck="true" lang="nb"></textarea>
+            <div id="write-input" class="sheet__input" role="textbox" aria-multiline="true" aria-label="Teksten din" spellcheck="true" lang="nb"></div>
           </div>
           <div class="sheet__foot">
             <p id="write-stats" class="sheet__stats"></p>

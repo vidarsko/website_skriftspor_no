@@ -298,7 +298,8 @@
     if (fresh) { cuts[fresh[0]] = 1; cuts[fresh[1]] = 1; }
     var points = Object.keys(cuts).map(Number).filter(function (x) { return x <= st.text.length; }).sort(function (a, b) { return a - b; });
 
-    var flags = runFlag(st.spans.runs);
+    var flags = runFlag(st.spans.runs, 'p');
+    var fmts = runFlag(st.spans.runs, 'f');
     var html = '';
     for (var i = 0; i < points.length; i++) {
       var from = points[i], to = points[i + 1];
@@ -311,6 +312,11 @@
       if (flags(from) === 1) cls.push('mark-pasted');
       if (flags(from) === 2) cls.push('mark-unknown');
       if (fresh && from >= fresh[0] && to <= fresh[1]) cls.push('player__fresh');
+      var f = fmts(from);
+      if (f & 1) cls.push('f-b');
+      if (f & 2) cls.push('f-i');
+      if (f & 4) cls.push('f-u');
+      if (f & 8) cls.push('f-h');
       var seg = esc(st.text.slice(from, to));
       html += cls.length ? '<span class="' + cls.join(' ') + '">' + seg + '</span>' : seg;
     }
@@ -345,7 +351,7 @@
   };
 
   /* Origin lookup by character position, for a sorted run list. */
-  function runFlag(runs) {
+  function runFlag(runs, key) {
     var starts = [], at = 0;
     runs.forEach(function (r) { starts.push(at); at += r.n; });
     return function (pos) {
@@ -354,7 +360,7 @@
         var mid = (lo + hi) >> 1;
         if (starts[mid] > pos) hi = mid - 1;
         else if (starts[mid] + runs[mid].n <= pos) lo = mid + 1;
-        else return runs[mid].p;
+        else return runs[mid][key] || 0;
       }
       return 0;
     };

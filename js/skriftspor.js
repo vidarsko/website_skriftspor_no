@@ -69,13 +69,15 @@
   /* Origin spans — which characters of the current text were typed and  */
   /* which were pasted, and in which session. Run-length encoded, so an   */
   /* insert costs O(number of runs), not O(length of text).               */
-  /*   run = { n: length, p: 0 typed | 1 pasted | 2 unknown, s: session } */
+  /*   run = { n: length, p: 0 typed | 1 pasted | 2 unknown, s: session, */
+  /*           f: formatting bits — 1 bold, 2 italic, 4 underline,        */
+  /*              8 heading (set on every character of a heading line) } */
   /* ------------------------------------------------------------------ */
 
   function Spans(runs) { this.runs = runs || []; }
 
   Spans.prototype.clone = function () {
-    return new Spans(this.runs.map(function (r) { return { n: r.n, p: r.p, s: r.s }; }));
+    return new Spans(this.runs.map(function (r) { return { n: r.n, p: r.p, s: r.s, f: r.f || 0 }; }));
   };
 
   Spans.prototype.length = function () {
@@ -92,7 +94,7 @@
       if (pos === at) return i;
       if (pos < at + runs[i].n) {
         var r = runs[i], left = pos - at;
-        runs.splice(i, 1, { n: left, p: r.p, s: r.s }, { n: r.n - left, p: r.p, s: r.s });
+        runs.splice(i, 1, { n: left, p: r.p, s: r.s, f: r.f || 0 }, { n: r.n - left, p: r.p, s: r.s, f: r.f || 0 });
         return i + 1;
       }
       at += runs[i].n;
@@ -106,16 +108,16 @@
       var r = this.runs[i];
       if (!r.n) continue;
       var last = out[out.length - 1];
-      if (last && last.p === r.p && last.s === r.s) last.n += r.n;
+      if (last && last.p === r.p && last.s === r.s && (last.f || 0) === (r.f || 0)) last.n += r.n;
       else out.push(r);
     }
     this.runs = out;
   };
 
-  Spans.prototype.insert = function (pos, n, p, s) {
+  Spans.prototype.insert = function (pos, n, p, s, f) {
     if (!n) return;
     var i = this._split(pos);
-    this.runs.splice(i, 0, { n: n, p: p, s: s });
+    this.runs.splice(i, 0, { n: n, p: p, s: s, f: f || 0 });
     this._merge();
   };
 
@@ -124,6 +126,39 @@
     var i = this._split(pos), j = this._split(pos + n);
     this.runs.splice(i, j - i);
     this._merge();
+  };
+
+  /* Turns formatting bit(s) on or off for [a, b). */
+  Spans.prototype.setFormat = function (a, b, bits, on) {
+    if (b <= a) return;
+    var i = this._split(a), j = this._split(b);
+    for (var k = i; k < j; k++) {
+      var r = this.runs[k];
+      r.f = on ? ((r.f || 0) | bits) : ((r.f || 0) & ~bits);
+    }
+    this._merge();
+  };
+
+  /* The runs covering [a, b), cut to fit. For undo. */
+  Spans.prototype.slice = function (a, b) {
+    var out = [], at = 0;
+    for (var i = 0; i < this.runs.length && at < b; i++) {
+      var r = this.runs[i], ra = at, rb = at + r.n;
+      at = rb;
+      var x = Math.max(a, ra), y = Math.min(b, rb);
+      if (y > x) out.push({ n: y - x, p: r.p, s: r.s, f: r.f || 0 });
+    }
+    return out;
+  };
+
+  /* Formatting bits of the character at pos (0 outside the text). */
+  Spans.prototype.formatAt = function (pos) {
+    var at = 0;
+    for (var i = 0; i < this.runs.length; i++) {
+      if (pos < at + this.runs[i].n) return this.runs[i].f || 0;
+      at += this.runs[i].n;
+    }
+    return 0;
   };
 
   /* Characters per origin: { typed, pasted, unknown }. */
@@ -153,8 +188,11 @@
   /* milliseconds since the previous event in the same session (0 for the */
   /* first). Deltas rather than timestamps because they compress better. */
   /*                                                                      */
-  /*   [dt, "i", pos, "text"]       typed text inserted at pos           */
-  /*   [dt, "p", pos, "text"]       pasted or dropped text inserted      */
+  /*   [dt, "i", pos, "text", fmt]  typed text inserted at pos           */
+  /*   [dt, "p", pos, "text", fmt]  pasted or dropped text inserted      */
+  /*        fmt is optional: formatting bits of the new text (see Spans) */
+  /*   [dt, "f", a, b, bits, on]    formatting turned on (1) or off (0)  */
+  /*                                for [a, b) — the text is unchanged   */
   /*   [dt, "d", pos, "text"]       "text" deleted, starting at pos      */
   /*   [dt, "c", start, end]        cursor moved / selection changed     */
   /*   [dt, "r", round, randomness, signature]   drand checkpoint        */
@@ -184,7 +222,7 @@
     if (type === 'i' || type === 'p') {
       if (pos < 0 || pos > this.text.length) throw new Error('innsetting utenfor teksten');
       this.text = this.text.slice(0, pos) + ev[3] + this.text.slice(pos);
-      this.spans.insert(pos, ev[3].length, type === 'p' ? 1 : 0, session);
+      this.spans.insert(pos, ev[3].length, type === 'p' ? 1 : 0, session, ev[4] || 0);
       this.caret = this.sel = pos + ev[3].length;
     } else if (type === 'd') {
       if (this.text.substr(pos, ev[3].length) !== ev[3]) throw new Error('sletting av tekst som ikke finnes');
@@ -193,6 +231,9 @@
       this.caret = this.sel = pos;
     } else if (type === 'c') {
       this.caret = pos; this.sel = ev[3];
+    } else if (type === 'f') {
+      if (pos < 0 || ev[3] > this.text.length || ev[3] < pos) throw new Error('formatering utenfor teksten');
+      this.spans.setFormat(pos, ev[3], ev[4], !!ev[5]);
     }
   };
 
