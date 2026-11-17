@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- skriftspor.no: a text cursor that has left a trail of dots behind it, on the burnt-orange primary.
+       Chosen 2026-11-17 as "skriftspor 1" from the proposals in the vault note "Ikoner til nettsidene - 2026-11-17". -->
+  <rect width="32" height="32" rx="7" fill="#B4470C"/><circle cx="5.00" cy="16.00" r="0.8" fill="#fff" opacity="0.35"/><circle cx="8.60" cy="16.00" r="1.15" fill="#fff" opacity="0.48"/><circle cx="12.20" cy="16.00" r="1.5" fill="#fff" opacity="0.61"/><circle cx="15.80" cy="16.00" r="1.85" fill="#fff" opacity="0.74"/><circle cx="19.40" cy="16.00" r="2.2" fill="#fff" opacity="0.87"/><path d="M23.5 7 H28 M25.75 7 V25 M23.5 25 H28" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>
